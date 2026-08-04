@@ -1,0 +1,93 @@
+Panels:
+  - Class: rviz/Displays
+    Help Height: 78
+    Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /Global Options1
+        - /Robot Model1
+        - /TF1
+      Splitter Ratio: 0.5
+    Tree Height: 549
+  - Class: rviz/Views
+    Name: Views
+    Expanded:
+      - Current View
+    Tree Height: 549
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Alpha: 1
+      Class: rviz/Grid
+      Color: 160; 160; 164
+      Enabled: true
+      Line Style:
+        Line Width: 0.03
+        Value: Lines
+      Name: Grid
+      Plane: XY
+      Plane Cell Count: 20
+      Reference Frame: <Fixed Frame>
+      Value: true
+    - Alpha: 1
+      Class: rviz/RobotModel
+      Collision Enabled: false
+      Description Source: Topic
+      Description Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+      Enabled: true
+      Name: Robot Model
+      Robot Description: robot_description
+      TF Prefix: ""
+      Update Interval: 0
+      Value: true
+      Visual Enabled: true
+    - Class: rviz/TF
+      Enabled: true
+      Frame Timeout: 15
+      Marker Scale: 0.25
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: false
+      Tree:
+        base_footprint:
+          base_link:
+            {}
+      Update Interval: 0
+      Value: true
+  Enabled: true
+  Global Options:
+    Background Color: 48; 52; 55
+    Default Light: true
+    Fixed Frame: base_footprint
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz/Interact
+    - Class: rviz/MoveCamera
+    - Class: rviz/Select
+  Value: true
+  Views:
+    Current:
+      Class: rviz/Orbit
+      Distance: 2.2
+      Focal Point: 0; 0; 0.15
+      Name: Current View
+      Pitch: 0.55
+      Target Frame: base_link
+      Yaw: 0.75
+    Saved: ~
+Window Geometry:
+  Displays:
+    collapsed: false
+  Height: 768
+  Hide Left Dock: false
+  Hide Right Dock: false
+  QMainWindow State: 000000ff00000000fd0000000100000000000001f4000002b8fc0200000008fb000000100044006900730070006c006100790073000000003b000002b8000000c900fffffffb0000000a00560069006500770073000000003b000002b8000000b000ffffff000000010000010f000002b8fc202000000060054006f006f006c00730000000000ffffffff00000000000000000000000000000000000000000000000004000000000000000000000000000000000800000008fc000000010000000200000001
+  Width: 1280
+  X: 80
+  Y: 40

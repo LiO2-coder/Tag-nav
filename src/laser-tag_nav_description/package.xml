@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>laser-tag_nav_description</name>
+  <version>0.1.0</version>
+  <description>Parametric industrial warehouse AGV description for ROS Noetic.</description>
+
+  <maintainer email="maintainer@example.com">laser-tag_nav maintainers</maintainer>
+  <license>BSD-3-Clause</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>gazebo_plugins</depend>
+  <depend>gazebo_ros</depend>
+  <depend>geometry_msgs</depend>
+  <depend>joint_state_publisher</depend>
+  <depend>robot_state_publisher</depend>
+  <depend>roslaunch</depend>
+  <depend>rviz</depend>
+  <depend>sensor_msgs</depend>
+  <depend>tf</depend>
+  <depend>urdf</depend>
+  <depend>velodyne_description</depend>
+  <depend>velodyne_gazebo_plugins</depend>
+  <depend>xacro</depend>
+
+  <export>
+  </export>
+</package>

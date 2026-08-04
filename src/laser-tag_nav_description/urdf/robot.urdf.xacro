@@ -1,0 +1,173 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="$(arg robot_name)">
+
+  <xacro:arg name="robot_name" default="warehouse_agv"/>
+  <xacro:arg name="namespace" default="/agv"/>
+  <xacro:arg name="chassis_length" default="0.90"/>
+  <xacro:arg name="chassis_width" default="0.64"/>
+  <xacro:arg name="chassis_height" default="0.24"/>
+  <xacro:arg name="wheel_radius" default="0.14"/>
+  <xacro:arg name="wheel_width" default="0.05"/>
+  <xacro:arg name="wheel_separation" default="0.704"/>
+  <xacro:arg name="camera_height" default="0.14"/>
+  <xacro:arg name="camera_pitch" default="0.034906585"/>
+  <xacro:arg name="ground_contact_preload" default="0.002"/>
+  <xacro:arg name="velodyne_height" default="0.27"/>
+  <xacro:arg name="laser_base_radius" default="0.02"/>
+  <xacro:arg name="laser_base_mass" default="0.25"/>
+
+  <xacro:property name="robot_name" value="$(arg robot_name)"/>
+  <xacro:property name="namespace" value="$(arg namespace)"/>
+
+  <xacro:property name="chassis_length" value="$(arg chassis_length)"/>
+  <xacro:property name="chassis_width" value="$(arg chassis_width)"/>
+  <xacro:property name="chassis_height" value="$(arg chassis_height)"/>
+  <xacro:property name="wheel_radius" value="$(arg wheel_radius)"/>
+  <xacro:property name="wheel_width" value="$(arg wheel_width)"/>
+  <xacro:property name="wheel_separation" value="$(arg wheel_separation)"/>
+  <xacro:property name="camera_height" value="$(arg camera_height)"/>
+  <xacro:property name="camera_pitch" value="$(arg camera_pitch)"/>
+  <xacro:property name="ground_contact_preload" value="$(arg ground_contact_preload)"/>
+  <xacro:property name="velodyne_height" value="$(arg velodyne_height)"/>
+  <xacro:property name="laser_base_radius" value="$(arg laser_base_radius)"/>
+  <xacro:property name="laser_base_mass" value="$(arg laser_base_mass)"/>
+
+  <xacro:property name="base_link_height" value="0.22"/>
+  <xacro:property name="platform_top_z" value="${0.145 + 0.05 / 2.0}"/>
+  <xacro:property name="laser_base_height" value="${velodyne_height - platform_top_z}"/>
+  <!-- A small preload avoids ODE treating mathematically tangent contacts as airborne. -->
+  <xacro:property name="wheel_center_z" value="${wheel_radius - base_link_height - ground_contact_preload}"/>
+  <xacro:property name="wheel_y" value="${wheel_separation / 2.0}"/>
+  <xacro:property name="wheel_mass" value="3.0"/>
+  <xacro:property name="caster_radius" value="0.05"/>
+  <xacro:property name="caster_center_z" value="${caster_radius - base_link_height - ground_contact_preload}"/>
+  <xacro:property name="caster_mass" value="0.8"/>
+  <xacro:property name="camera_fov" value="${120.0 * pi / 180.0}"/>
+
+  <xacro:include filename="$(find velodyne_description)/urdf/VLP-16.urdf.xacro"/>
+  <xacro:include filename="materials.xacro"/>
+  <xacro:include filename="macros.xacro"/>
+  <xacro:include filename="robot.gazebo.xacro"/>
+
+  <link name="base_footprint"/>
+
+  <xacro:box_link
+    name="base_link"
+    mass="40.0"
+    x="${chassis_length}"
+    y="${chassis_width}"
+    z="${chassis_height}"
+    material="agv_orange"
+    gazebo_material="Gazebo/Orange"/>
+
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 ${base_link_height}" rpy="0 0 0"/>
+  </joint>
+
+  <xacro:box_link
+    name="top_deck_link"
+    mass="8.0"
+    x="0.82"
+    y="0.56"
+    z="0.05"
+    material="deck_gray"
+    gazebo_material="Gazebo/Grey"/>
+  <joint name="top_deck_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="top_deck_link"/>
+    <origin xyz="0 0 0.145" rpy="0 0 0"/>
+  </joint>
+
+  <xacro:laser_base
+    name="laser_base"
+    radius="${laser_base_radius}"
+    length="${laser_base_height}"
+    mass="${laser_base_mass}"
+    material="deck_gray"
+    gazebo_material="Gazebo/Grey"/>
+  <joint name="laser_base_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="laser_base"/>
+    <origin xyz="0 0 ${platform_top_z}" rpy="0 0 0"/>
+  </joint>
+
+  <xacro:VLP-16
+    parent="laser_base"
+    name="velodyne"
+    topic="/velodyne_points"
+    hz="10"
+    samples="440"
+    gpu="false">
+    <origin xyz="0 0 ${laser_base_height}" rpy="0 0 0"/>
+  </xacro:VLP-16>
+
+  <xacro:box_link
+    name="front_bumper_link"
+    mass="1.2"
+    x="0.08"
+    y="0.68"
+    z="0.08"
+    material="safety_yellow"
+    gazebo_material="Gazebo/Yellow"/>
+  <joint name="front_bumper_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="front_bumper_link"/>
+    <origin xyz="${chassis_length / 2.0 + 0.02} 0 -0.07" rpy="0 0 0"/>
+  </joint>
+
+  <xacro:box_link
+    name="rear_bumper_link"
+    mass="1.2"
+    x="0.08"
+    y="0.68"
+    z="0.08"
+    material="safety_yellow"
+    gazebo_material="Gazebo/Yellow"/>
+  <joint name="rear_bumper_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="rear_bumper_link"/>
+    <origin xyz="-${chassis_length / 2.0 + 0.02} 0 -0.07" rpy="0 0 0"/>
+  </joint>
+
+  <xacro:drive_wheel side="left" y="${wheel_y}"/>
+  <xacro:drive_wheel side="right" y="-${wheel_y}"/>
+
+  <xacro:caster name="caster_front_left" x="0.33" y="0.24"/>
+  <xacro:caster name="caster_front_right" x="0.33" y="-0.24"/>
+  <xacro:caster name="caster_rear_left" x="-0.33" y="0.24"/>
+  <xacro:caster name="caster_rear_right" x="-0.33" y="-0.24"/>
+
+  <link name="imu_link">
+    <visual>
+      <geometry>
+        <box size="0.06 0.06 0.025"/>
+      </geometry>
+      <material name="sensor_gray"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.06 0.06 0.025"/>
+      </geometry>
+    </collision>
+    <xacro:box_inertial mass="0.08" x="0.06" y="0.06" z="0.025"/>
+  </link>
+  <gazebo reference="imu_link">
+    <material>Gazebo/Grey</material>
+    <preserveFixedJoint>true</preserveFixedJoint>
+  </gazebo>
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin xyz="0 0 0.025" rpy="0 0 0"/>
+  </joint>
+
+  <xacro:wide_angle_camera name="camera_front" topic_name="front" xyz="0.43 0 ${camera_height}" yaw="0" pitch="${camera_pitch}" namespace="${namespace}"/>
+  <xacro:wide_angle_camera name="camera_rear" topic_name="rear" xyz="-0.43 0 ${camera_height}" yaw="${pi}" pitch="${camera_pitch}" namespace="${namespace}"/>
+  <xacro:wide_angle_camera name="camera_left" topic_name="left" xyz="0 0.32 ${camera_height}" yaw="${pi / 2.0}" pitch="${camera_pitch}" namespace="${namespace}"/>
+  <xacro:wide_angle_camera name="camera_right" topic_name="right" xyz="0 -0.32 ${camera_height}" yaw="${-pi / 2.0}" pitch="${camera_pitch}" namespace="${namespace}"/>
+
+  <xacro:warehouse_agv_gazebo robot_name="${robot_name}" namespace="${namespace}"/>
+
+</robot>
