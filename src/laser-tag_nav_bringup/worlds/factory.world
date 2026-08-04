@@ -1,0 +1,181 @@
+<?xml version="1.0" ?>
+<sdf version="1.7">
+  <world name="arena_20x25">
+
+    <!-- 物理引擎 -->
+    <physics name="default_physics" default="true" type="ode">
+      <gravity>0 0 -9.81</gravity>
+      <ode>
+        <solver>
+          <type>quick</type>
+          <iters>50</iters>
+        </solver>
+      </ode>
+    </physics>
+
+    <!-- 地面（无限） -->
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+
+    <!-- ==================== 四个太阳光源 ==================== -->
+    <!-- 移除默认的 sun 模型，改用四个定向光，模拟不同角度的日光 -->
+
+    <!-- 光源1：东北方向 -->
+    <light name="sun_northeast" type="directional">
+      <pose>0 0 10 0 0 0</pose>  <!-- 位置不影响方向光，仅用于可视化 -->
+      <direction>0.5 0.5 -1</direction>  <!-- 斜向照射原点 -->
+      <cast_shadows>true</cast_shadows>
+      <diffuse>1 1 1 1</diffuse>
+      <specular>0.8 0.8 0.8 1</specular>
+      <attenuation>
+        <range>100</range>
+        <constant>1.0</constant>
+        <linear>0.0</linear>
+        <quadratic>0.0</quadratic>
+      </attenuation>
+    </light>
+
+    <!-- 光源2：西北方向 -->
+    <light name="sun_northwest" type="directional">
+      <pose>0 0 10 0 0 0</pose>
+      <direction>-0.5 0.5 -1</direction>
+      <cast_shadows>true</cast_shadows>
+      <diffuse>1 1 1 1</diffuse>
+      <specular>0.8 0.8 0.8 1</specular>
+      <attenuation>
+        <range>100</range>
+        <constant>1.0</constant>
+        <linear>0.0</linear>
+        <quadratic>0.0</quadratic>
+      </attenuation>
+    </light>
+
+    <!-- 光源3：东南方向 -->
+    <light name="sun_southeast" type="directional">
+      <pose>0 0 10 0 0 0</pose>
+      <direction>0.5 -0.5 -1</direction>
+      <cast_shadows>true</cast_shadows>
+      <diffuse>1 1 1 1</diffuse>
+      <specular>0.8 0.8 0.8 1</specular>
+      <attenuation>
+        <range>100</range>
+        <constant>1.0</constant>
+        <linear>0.0</linear>
+        <quadratic>0.0</quadratic>
+      </attenuation>
+    </light>
+
+    <!-- 光源4：西南方向 -->
+    <light name="sun_southwest" type="directional">
+      <pose>0 0 10 0 0 0</pose>
+      <direction>-0.5 -0.5 -1</direction>
+      <cast_shadows>true</cast_shadows>
+      <diffuse>1 1 1 1</diffuse>
+      <specular>0.8 0.8 0.8 1</specular>
+      <attenuation>
+        <range>100</range>
+        <constant>1.0</constant>
+        <linear>0.0</linear>
+        <quadratic>0.0</quadratic>
+      </attenuation>
+    </light>
+
+    <!-- ==================== 深灰色围墙 ==================== -->
+    <!-- 墙体尺寸：高5m，厚0.3m，深灰色（RGB约0.3,0.3,0.3） -->
+    <!-- 区域范围：X方向 [-10, 10]（总长20m），Y方向 [-12.5, 12.5]（总宽25m） -->
+
+    <!-- 北墙（X正方向） -->
+    <model name="wall_north">
+      <static>true</static>
+      <pose>10 0 2.5 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box><size>0.3 25.0 5.0</size></box>
+          </geometry>
+          <material>
+            <ambient>0.25 0.25 0.25 1.0</ambient>
+            <diffuse>0.35 0.35 0.35 1.0</diffuse>
+            <specular>0.1 0.1 0.1 1.0</specular>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <box><size>0.3 25.0 5.0</size></box>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- 南墙（X负方向） -->
+    <model name="wall_south">
+      <static>true</static>
+      <pose>-10 0 2.5 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box><size>0.3 25.0 5.0</size></box>
+          </geometry>
+          <material>
+            <ambient>0.25 0.25 0.25 1.0</ambient>
+            <diffuse>0.35 0.35 0.35 1.0</diffuse>
+            <specular>0.1 0.1 0.1 1.0</specular>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <box><size>0.3 25.0 5.0</size></box>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- 东墙（Y正方向） -->
+    <model name="wall_east">
+      <static>true</static>
+      <pose>0 12.5 2.5 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box><size>20.0 0.3 5.0</size></box>
+          </geometry>
+          <material>
+            <ambient>0.25 0.25 0.25 1.0</ambient>
+            <diffuse>0.35 0.35 0.35 1.0</diffuse>
+            <specular>0.1 0.1 0.1 1.0</specular>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <box><size>20.0 0.3 5.0</size></box>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- 西墙（Y负方向） -->
+    <model name="wall_west">
+      <static>true</static>
+      <pose>0 -12.5 2.5 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box><size>20.0 0.3 5.0</size></box>
+          </geometry>
+          <material>
+            <ambient>0.25 0.25 0.25 1.0</ambient>
+            <diffuse>0.35 0.35 0.35 1.0</diffuse>
+            <specular>0.1 0.1 0.1 1.0</specular>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <box><size>20.0 0.3 5.0</size></box>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+
+  </world>
+</sdf>
