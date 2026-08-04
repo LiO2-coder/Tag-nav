@@ -1,0 +1,3 @@
+[submodule "src/3rd_party/pytagmapper"]
+	path = src/3rd_party/pytagmapper
+	url = https://github.com/markisus/pytagmapper.git
