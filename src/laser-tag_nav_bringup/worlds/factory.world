@@ -2,9 +2,20 @@
 <sdf version="1.7">
   <world name="arena_20x25">
 
+    <!-- 世界重力必须直接位于 world 下，不能放在 physics 内 -->
+    <gravity>0 0 -9.81</gravity>
+
+    <!-- 场景环境光；其余方向光作为无阴影补光，避免多套阴影叠加 -->
+    <scene>
+      <ambient>0.30 0.30 0.30 1.0</ambient>
+      <shadows>true</shadows>
+    </scene>
+
     <!-- 物理引擎 -->
     <physics name="default_physics" default="true" type="ode">
-      <gravity>0 0 -9.81</gravity>
+      <!-- 1 kHz 物理更新，适合移动底盘与墙体碰撞 -->
+      <max_step_size>0.001</max_step_size>
+      <real_time_update_rate>1000</real_time_update_rate>
       <ode>
         <solver>
           <type>quick</type>
@@ -18,6 +29,371 @@
       <uri>model://ground_plane</uri>
     </include>
 
+    <!--
+      AprilTag floor grid: visual-only 0.075m x 0.075m printed stickers at
+      1m integer grid intersections. Their central 544px x 544px detection
+      code is 0.10m x 0.10m; the surrounding black/white border is retained.
+      The valid grid is x=-9..9, y=12..-12, scanned left-to-right and then
+      top-to-bottom, using tag36h11_0..tag36h11_474.
+    -->
+    <include>
+      <uri>model://apriltag_floor</uri>
+    </include>
+
+    <!-- ==================== 单体 box 货架 ==================== -->
+    <!-- 货架底面均落在 z=0；每个货架只包含一个 visual 和一个 collision。 -->
+
+    <!-- 货架 A：红色，中心 (-5, 3)，尺寸 3 x 1.2 x 2.2 m -->
+    <model name="shelf_a">
+      <static>true</static>
+      <pose>-5.0 3.0 1.1 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box><size>3.0 1.2 2.2</size></box>
+          </geometry>
+          <material>
+            <ambient>0.8 0.0 0.0 1.0</ambient>
+            <diffuse>0.8 0.0 0.0 1.0</diffuse>
+            <specular>0.1 0.1 0.1 1.0</specular>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <box><size>3.0 1.2 2.2</size></box>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- 货架 B：蓝色，中心 (3, 3)，尺寸 3 x 1.2 x 2.2 m -->
+    <model name="shelf_b">
+      <static>true</static>
+      <pose>3.0 3.0 1.1 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box><size>3.0 1.2 2.2</size></box>
+          </geometry>
+          <material>
+            <ambient>0.0 0.0 0.8 1.0</ambient>
+            <diffuse>0.0 0.0 0.8 1.0</diffuse>
+            <specular>0.1 0.1 0.1 1.0</specular>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <box><size>3.0 1.2 2.2</size></box>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- 货架 C：黄色，短边贴 X 负墙，中心 (-6.85, -7)，尺寸 6 x 1.5 x 3.5 m -->
+    <model name="shelf_c">
+      <static>true</static>
+      <pose>-6.85 -7.0 1.75 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box><size>6.0 1.5 3.5</size></box>
+          </geometry>
+          <material>
+            <ambient>0.8 0.8 0.0 1.0</ambient>
+            <diffuse>0.8 0.8 0.0 1.0</diffuse>
+            <specular>0.1 0.1 0.1 1.0</specular>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <box><size>6.0 1.5 3.5</size></box>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- 货架 D：绿色，为 C 关于原点的中心对称，尺寸 6 x 1.5 x 3.5 m -->
+    <model name="shelf_d">
+      <static>true</static>
+      <pose>6.85 7.0 1.75 0 0 3.14159265</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box><size>6.0 1.5 3.5</size></box>
+          </geometry>
+          <material>
+            <ambient>0.0 0.6 0.0 1.0</ambient>
+            <diffuse>0.0 0.6 0.0 1.0</diffuse>
+            <specular>0.1 0.1 0.1 1.0</specular>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <box><size>6.0 1.5 3.5</size></box>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- ==================== 第四象限的亮橙色原生几何障碍 ==================== -->
+    <!-- 采用从区域中心向边界扩散的固定随机布局，所有物体间保留至少 2m 间距。 -->
+
+    <!-- 圆柱 1 -->
+    <model name="orange_cylinder_1">
+      <static>true</static>
+      <pose>6.443 -6.468 0.60 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.20</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>1.0 0.3 0.0 1.0</ambient>
+            <diffuse>1.0 0.3 0.0 1.0</diffuse>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.20</length>
+            </cylinder>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- 圆柱 2 -->
+    <model name="orange_cylinder_2">
+      <static>true</static>
+      <pose>9.266 -4.447 0.60 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.20</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>1.0 0.3 0.0 1.0</ambient>
+            <diffuse>1.0 0.3 0.0 1.0</diffuse>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.20</length>
+            </cylinder>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- 圆柱 3 -->
+    <model name="orange_cylinder_3">
+      <static>true</static>
+      <pose>5.391 -3.336 0.60 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.20</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>1.0 0.3 0.0 1.0</ambient>
+            <diffuse>1.0 0.3 0.0 1.0</diffuse>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.20</length>
+            </cylinder>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- 圆柱 4 -->
+    <model name="orange_cylinder_4">
+      <static>true</static>
+      <pose>7.772 -9.743 0.60 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.20</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>1.0 0.3 0.0 1.0</ambient>
+            <diffuse>1.0 0.3 0.0 1.0</diffuse>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.20</length>
+            </cylinder>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- 圆柱 5 -->
+    <model name="orange_cylinder_5">
+      <static>true</static>
+      <pose>3.074 -0.269 0.60 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.20</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>1.0 0.3 0.0 1.0</ambient>
+            <diffuse>1.0 0.3 0.0 1.0</diffuse>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.20</length>
+            </cylinder>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- 圆柱 6 -->
+    <model name="orange_cylinder_6">
+      <static>true</static>
+      <pose>8.927 -0.772 0.60 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.20</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>1.0 0.3 0.0 1.0</ambient>
+            <diffuse>1.0 0.3 0.0 1.0</diffuse>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.20</length>
+            </cylinder>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- 长条柱 1 -->
+    <model name="orange_bar_1">
+      <static>true</static>
+      <pose>2.949 -6.774 1.40 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box><size>0.30 0.60 2.80</size></box>
+          </geometry>
+          <material>
+            <ambient>1.0 0.3 0.0 1.0</ambient>
+            <diffuse>1.0 0.3 0.0 1.0</diffuse>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <box><size>0.30 0.60 2.80</size></box>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- 长条柱 2 -->
+    <model name="orange_bar_2">
+      <static>true</static>
+      <pose>4.388 -9.860 1.40 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box><size>0.30 0.60 2.80</size></box>
+          </geometry>
+          <material>
+            <ambient>1.0 0.3 0.0 1.0</ambient>
+            <diffuse>1.0 0.3 0.0 1.0</diffuse>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <box><size>0.30 0.60 2.80</size></box>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- 长条柱 3 -->
+    <model name="orange_bar_3">
+      <static>true</static>
+      <pose>6.066 -0.502 1.40 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box><size>0.30 0.60 2.80</size></box>
+          </geometry>
+          <material>
+            <ambient>1.0 0.3 0.0 1.0</ambient>
+            <diffuse>1.0 0.3 0.0 1.0</diffuse>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <box><size>0.30 0.60 2.80</size></box>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- 长条柱 4 -->
+    <model name="orange_bar_4">
+      <static>true</static>
+      <pose>9.192 -12.022 1.40 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box><size>0.30 0.60 2.80</size></box>
+          </geometry>
+          <material>
+            <ambient>1.0 0.3 0.0 1.0</ambient>
+            <diffuse>1.0 0.3 0.0 1.0</diffuse>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <box><size>0.30 0.60 2.80</size></box>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+
     <!-- ==================== 四个太阳光源 ==================== -->
     <!-- 移除默认的 sun 模型，改用四个定向光，模拟不同角度的日光 -->
 
@@ -26,8 +402,8 @@
       <pose>0 0 10 0 0 0</pose>  <!-- 位置不影响方向光，仅用于可视化 -->
       <direction>0.5 0.5 -1</direction>  <!-- 斜向照射原点 -->
       <cast_shadows>true</cast_shadows>
-      <diffuse>1 1 1 1</diffuse>
-      <specular>0.8 0.8 0.8 1</specular>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
       <attenuation>
         <range>100</range>
         <constant>1.0</constant>
@@ -40,9 +416,9 @@
     <light name="sun_northwest" type="directional">
       <pose>0 0 10 0 0 0</pose>
       <direction>-0.5 0.5 -1</direction>
-      <cast_shadows>true</cast_shadows>
-      <diffuse>1 1 1 1</diffuse>
-      <specular>0.8 0.8 0.8 1</specular>
+      <cast_shadows>false</cast_shadows>
+      <diffuse>0.15 0.15 0.15 1</diffuse>
+      <specular>0.05 0.05 0.05 1</specular>
       <attenuation>
         <range>100</range>
         <constant>1.0</constant>
@@ -55,9 +431,9 @@
     <light name="sun_southeast" type="directional">
       <pose>0 0 10 0 0 0</pose>
       <direction>0.5 -0.5 -1</direction>
-      <cast_shadows>true</cast_shadows>
-      <diffuse>1 1 1 1</diffuse>
-      <specular>0.8 0.8 0.8 1</specular>
+      <cast_shadows>false</cast_shadows>
+      <diffuse>0.15 0.15 0.15 1</diffuse>
+      <specular>0.05 0.05 0.05 1</specular>
       <attenuation>
         <range>100</range>
         <constant>1.0</constant>
@@ -70,9 +446,9 @@
     <light name="sun_southwest" type="directional">
       <pose>0 0 10 0 0 0</pose>
       <direction>-0.5 -0.5 -1</direction>
-      <cast_shadows>true</cast_shadows>
-      <diffuse>1 1 1 1</diffuse>
-      <specular>0.8 0.8 0.8 1</specular>
+      <cast_shadows>false</cast_shadows>
+      <diffuse>0.15 0.15 0.15 1</diffuse>
+      <specular>0.05 0.05 0.05 1</specular>
       <attenuation>
         <range>100</range>
         <constant>1.0</constant>
@@ -83,9 +459,13 @@
 
     <!-- ==================== 深灰色围墙 ==================== -->
     <!-- 墙体尺寸：高5m，厚0.3m，深灰色（RGB约0.3,0.3,0.3） -->
-    <!-- 区域范围：X方向 [-10, 10]（总长20m），Y方向 [-12.5, 12.5]（总宽25m） -->
+    <!--
+      当前墙体中心线范围：X [-10, 10]、Y [-12.5, 12.5]。
+      因墙厚为0.3m，外轮廓约为20.3m x 25.3m，墙内净空约为19.7m x 24.7m。
+      如需导航区域严格为20m x 25m，应将墙中心分别放到 +/-10.15m、+/-12.65m。
+    -->
 
-    <!-- 北墙（X正方向） -->
+    <!-- X正方向墙 -->
     <model name="wall_north">
       <static>true</static>
       <pose>10 0 2.5 0 0 0</pose>
@@ -108,7 +488,7 @@
       </link>
     </model>
 
-    <!-- 南墙（X负方向） -->
+    <!-- X负方向墙 -->
     <model name="wall_south">
       <static>true</static>
       <pose>-10 0 2.5 0 0 0</pose>
@@ -131,7 +511,7 @@
       </link>
     </model>
 
-    <!-- 东墙（Y正方向） -->
+    <!-- Y正方向墙 -->
     <model name="wall_east">
       <static>true</static>
       <pose>0 12.5 2.5 0 0 0</pose>
@@ -154,7 +534,7 @@
       </link>
     </model>
 
-    <!-- 西墙（Y负方向） -->
+    <!-- Y负方向墙 -->
     <model name="wall_west">
       <static>true</static>
       <pose>0 -12.5 2.5 0 0 0</pose>

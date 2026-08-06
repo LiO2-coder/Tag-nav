@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<sdf version="1.7">
+  <model name="apriltag_floor">
+    <static>true</static>
+    <pose>0 0 0.001 0 0 0</pose>
+    <link name="link">
+      <visual name="apriltag_grid">
+        <cast_shadows>false</cast_shadows>
+        <geometry>
+          <mesh>
+            <uri>model://apriltag_floor/meshes/apriltag_grid.obj</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <uri>model://apriltag_floor/materials/scripts</uri>
+            <uri>model://apriltag_floor/materials/textures</uri>
+            <name>AprilTag/Atlas</name>
+          </script>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>

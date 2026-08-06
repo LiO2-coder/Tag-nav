@@ -1,0 +1,7 @@
+# Material name is also used by the SDF visual material.
+newmtl apriltag_atlas
+Ka 1.0 1.0 1.0
+Kd 1.0 1.0 1.0
+Ks 0.0 0.0 0.0
+d 1.0
+illum 1
