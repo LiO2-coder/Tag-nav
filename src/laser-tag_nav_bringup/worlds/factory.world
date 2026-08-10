@@ -1,559 +1,1153 @@
-<?xml version="1.0" ?>
-<sdf version="1.7">
-  <world name="arena_20x25">
-
-    <!-- 世界重力必须直接位于 world 下，不能放在 physics 内 -->
+<sdf version='1.7'>
+  <world name='arena_20x25'>
     <gravity>0 0 -9.81</gravity>
-
-    <!-- 场景环境光；其余方向光作为无阴影补光，避免多套阴影叠加 -->
     <scene>
-      <ambient>0.30 0.30 0.30 1.0</ambient>
-      <shadows>true</shadows>
+      <ambient>0.3 0.3 0.3 1</ambient>
+      <shadows>1</shadows>
+      <background>0.7 0.7 0.7 1</background>
     </scene>
-
-    <!-- 物理引擎 -->
-    <physics name="default_physics" default="true" type="ode">
-      <!-- 1 kHz 物理更新，适合移动底盘与墙体碰撞 -->
+    <physics name='default_physics' default='1' type='ode'>
       <max_step_size>0.001</max_step_size>
       <real_time_update_rate>1000</real_time_update_rate>
       <ode>
         <solver>
           <type>quick</type>
           <iters>50</iters>
+          <sor>1.3</sor>
+          <use_dynamic_moi_rescaling>0</use_dynamic_moi_rescaling>
         </solver>
+        <constraints>
+          <cfm>0</cfm>
+          <erp>0.2</erp>
+          <contact_max_correcting_vel>100</contact_max_correcting_vel>
+          <contact_surface_layer>0.001</contact_surface_layer>
+        </constraints>
       </ode>
+      <real_time_factor>1</real_time_factor>
     </physics>
-
-    <!-- 地面（无限） -->
-    <include>
-      <uri>model://ground_plane</uri>
-    </include>
-
-    <!--
-      AprilTag floor grid: visual-only 0.075m x 0.075m printed stickers at
-      1m integer grid intersections. Their central 544px x 544px detection
-      code is 0.10m x 0.10m; the surrounding black/white border is retained.
-      The valid grid is x=-9..9, y=12..-12, scanned left-to-right and then
-      top-to-bottom, using tag36h11_0..tag36h11_474.
-    -->
-    <include>
-      <uri>model://apriltag_floor</uri>
-    </include>
-
-    <!-- ==================== 单体 box 货架 ==================== -->
-    <!-- 货架底面均落在 z=0；每个货架只包含一个 visual 和一个 collision。 -->
-
-    <!-- 货架 A：红色，中心 (-5, 3)，尺寸 3 x 1.2 x 2.2 m -->
-    <model name="shelf_a">
-      <static>true</static>
-      <pose>-5.0 3.0 1.1 0 0 0</pose>
-      <link name="link">
-        <visual name="visual">
+    <model name='ground_plane'>
+      <static>1</static>
+      <link name='link'>
+        <collision name='collision'>
           <geometry>
-            <box><size>3.0 1.2 2.2</size></box>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>100</mu>
+                <mu2>50</mu2>
+              </ode>
+              <torsional>
+                <ode/>
+              </torsional>
+            </friction>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+          </surface>
+          <max_contacts>10</max_contacts>
+        </collision>
+        <visual name='visual'>
+          <cast_shadows>0</cast_shadows>
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
           </geometry>
           <material>
-            <ambient>0.8 0.0 0.0 1.0</ambient>
-            <diffuse>0.8 0.0 0.0 1.0</diffuse>
-            <specular>0.1 0.1 0.1 1.0</specular>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Grey</name>
+            </script>
           </material>
         </visual>
-        <collision name="collision">
-          <geometry>
-            <box><size>3.0 1.2 2.2</size></box>
-          </geometry>
-        </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
       </link>
     </model>
-
-    <!-- 货架 B：蓝色，中心 (3, 3)，尺寸 3 x 1.2 x 2.2 m -->
-    <model name="shelf_b">
-      <static>true</static>
-      <pose>3.0 3.0 1.1 0 0 0</pose>
-      <link name="link">
-        <visual name="visual">
+    <model name='apriltag_floor'>
+      <static>1</static>
+      <pose>0 0 0.001 0 -0 0</pose>
+      <link name='link'>
+        <visual name='apriltag_grid'>
+          <cast_shadows>0</cast_shadows>
           <geometry>
-            <box><size>3.0 1.2 2.2</size></box>
+            <mesh>
+              <uri>model://apriltag_floor/meshes/apriltag_grid.obj</uri>
+            </mesh>
           </geometry>
           <material>
-            <ambient>0.0 0.0 0.8 1.0</ambient>
-            <diffuse>0.0 0.0 0.8 1.0</diffuse>
-            <specular>0.1 0.1 0.1 1.0</specular>
+            <script>
+              <uri>model://apriltag_floor/materials/scripts</uri>
+              <uri>model://apriltag_floor/materials/textures</uri>
+              <name>AprilTag/Atlas</name>
+            </script>
           </material>
         </visual>
-        <collision name="collision">
-          <geometry>
-            <box><size>3.0 1.2 2.2</size></box>
-          </geometry>
-        </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
       </link>
     </model>
-
-    <!-- 货架 C：黄色，短边贴 X 负墙，中心 (-6.85, -7)，尺寸 6 x 1.5 x 3.5 m -->
-    <model name="shelf_c">
-      <static>true</static>
-      <pose>-6.85 -7.0 1.75 0 0 0</pose>
-      <link name="link">
-        <visual name="visual">
+    <model name='shelf_a'>
+      <static>1</static>
+      <pose>-5 3 1.1 0 -0 0</pose>
+      <link name='link'>
+        <visual name='visual'>
           <geometry>
-            <box><size>6.0 1.5 3.5</size></box>
+            <box>
+              <size>3 1.2 2.2</size>
+            </box>
           </geometry>
           <material>
-            <ambient>0.8 0.8 0.0 1.0</ambient>
-            <diffuse>0.8 0.8 0.0 1.0</diffuse>
-            <specular>0.1 0.1 0.1 1.0</specular>
+            <ambient>0.8 0 0 1</ambient>
+            <diffuse>0.8 0 0 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
           </material>
         </visual>
-        <collision name="collision">
+        <collision name='collision'>
           <geometry>
-            <box><size>6.0 1.5 3.5</size></box>
+            <box>
+              <size>3 1.2 2.2</size>
+            </box>
           </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
         </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
       </link>
     </model>
-
-    <!-- 货架 D：绿色，为 C 关于原点的中心对称，尺寸 6 x 1.5 x 3.5 m -->
-    <model name="shelf_d">
-      <static>true</static>
-      <pose>6.85 7.0 1.75 0 0 3.14159265</pose>
-      <link name="link">
-        <visual name="visual">
+    <model name='shelf_b'>
+      <static>1</static>
+      <pose>3 3 1.1 0 -0 0</pose>
+      <link name='link'>
+        <visual name='visual'>
           <geometry>
-            <box><size>6.0 1.5 3.5</size></box>
+            <box>
+              <size>3 1.2 2.2</size>
+            </box>
           </geometry>
           <material>
-            <ambient>0.0 0.6 0.0 1.0</ambient>
-            <diffuse>0.0 0.6 0.0 1.0</diffuse>
-            <specular>0.1 0.1 0.1 1.0</specular>
+            <ambient>0 0 0.8 1</ambient>
+            <diffuse>0 0 0.8 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
           </material>
         </visual>
-        <collision name="collision">
+        <collision name='collision'>
           <geometry>
-            <box><size>6.0 1.5 3.5</size></box>
+            <box>
+              <size>3 1.2 2.2</size>
+            </box>
           </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
         </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
       </link>
     </model>
-
-    <!-- ==================== 第四象限的亮橙色原生几何障碍 ==================== -->
-    <!-- 采用从区域中心向边界扩散的固定随机布局，所有物体间保留至少 2m 间距。 -->
-
-    <!-- 圆柱 1 -->
-    <model name="orange_cylinder_1">
-      <static>true</static>
-      <pose>6.443 -6.468 0.60 0 0 0</pose>
-      <link name="link">
-        <visual name="visual">
+    <model name='shelf_c'>
+      <static>1</static>
+      <pose>-6.85 -7 1.75 0 -0 0</pose>
+      <link name='link'>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>6 1.5 3.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.8 0.8 0 1</ambient>
+            <diffuse>0.8 0.8 0 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>6 1.5 3.5</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+    </model>
+    <model name='shelf_d'>
+      <static>1</static>
+      <pose>6.85 7 1.75 0 -0 3.14159</pose>
+      <link name='link'>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>6 1.5 3.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0 0.6 0 1</ambient>
+            <diffuse>0 0.6 0 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>6 1.5 3.5</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+    </model>
+    <model name='orange_cylinder_1'>
+      <static>1</static>
+      <pose>6.995 -5.472 0.6 0 -0 0</pose>
+      <link name='link'>
+        <visual name='visual'>
           <geometry>
             <cylinder>
               <radius>0.25</radius>
-              <length>1.20</length>
+              <length>1.2</length>
             </cylinder>
           </geometry>
           <material>
-            <ambient>1.0 0.3 0.0 1.0</ambient>
-            <diffuse>1.0 0.3 0.0 1.0</diffuse>
+            <ambient>1 0.3 0 1</ambient>
+            <diffuse>1 0.3 0 1</diffuse>
           </material>
         </visual>
-        <collision name="collision">
+        <collision name='collision'>
           <geometry>
             <cylinder>
               <radius>0.25</radius>
-              <length>1.20</length>
+              <length>1.2</length>
             </cylinder>
           </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
         </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
       </link>
     </model>
-
-    <!-- 圆柱 2 -->
-    <model name="orange_cylinder_2">
-      <static>true</static>
-      <pose>9.266 -4.447 0.60 0 0 0</pose>
-      <link name="link">
-        <visual name="visual">
+    <model name='orange_cylinder_2'>
+      <static>1</static>
+      <pose>3.074 -0.269 0.6 0 -0 0</pose>
+      <link name='link'>
+        <visual name='visual'>
           <geometry>
             <cylinder>
               <radius>0.25</radius>
-              <length>1.20</length>
+              <length>1.2</length>
             </cylinder>
           </geometry>
           <material>
-            <ambient>1.0 0.3 0.0 1.0</ambient>
-            <diffuse>1.0 0.3 0.0 1.0</diffuse>
+            <ambient>1 0.3 0 1</ambient>
+            <diffuse>1 0.3 0 1</diffuse>
           </material>
         </visual>
-        <collision name="collision">
+        <collision name='collision'>
           <geometry>
             <cylinder>
               <radius>0.25</radius>
-              <length>1.20</length>
+              <length>1.2</length>
             </cylinder>
           </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
         </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
       </link>
     </model>
-
-    <!-- 圆柱 3 -->
-    <model name="orange_cylinder_3">
-      <static>true</static>
-      <pose>5.391 -3.336 0.60 0 0 0</pose>
-      <link name="link">
-        <visual name="visual">
+    <model name='orange_cylinder_3'>
+      <static>1</static>
+      <pose>3.454 -4.469 0.6 0 -0 0</pose>
+      <link name='link'>
+        <visual name='visual'>
           <geometry>
             <cylinder>
               <radius>0.25</radius>
-              <length>1.20</length>
-            </cylinder>
-          </geometry>
-          <material>
-            <ambient>1.0 0.3 0.0 1.0</ambient>
-            <diffuse>1.0 0.3 0.0 1.0</diffuse>
-          </material>
-        </visual>
-        <collision name="collision">
-          <geometry>
-            <cylinder>
-              <radius>0.25</radius>
-              <length>1.20</length>
-            </cylinder>
-          </geometry>
-        </collision>
-      </link>
-    </model>
-
-    <!-- 圆柱 4 -->
-    <model name="orange_cylinder_4">
-      <static>true</static>
-      <pose>7.772 -9.743 0.60 0 0 0</pose>
-      <link name="link">
-        <visual name="visual">
-          <geometry>
-            <cylinder>
-              <radius>0.25</radius>
-              <length>1.20</length>
+              <length>1.2</length>
             </cylinder>
           </geometry>
           <material>
-            <ambient>1.0 0.3 0.0 1.0</ambient>
-            <diffuse>1.0 0.3 0.0 1.0</diffuse>
+            <ambient>1 0.3 0 1</ambient>
+            <diffuse>1 0.3 0 1</diffuse>
           </material>
         </visual>
-        <collision name="collision">
+        <collision name='collision'>
           <geometry>
             <cylinder>
               <radius>0.25</radius>
-              <length>1.20</length>
+              <length>1.2</length>
             </cylinder>
           </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
         </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
       </link>
     </model>
-
-    <!-- 圆柱 5 -->
-    <model name="orange_cylinder_5">
-      <static>true</static>
-      <pose>3.074 -0.269 0.60 0 0 0</pose>
-      <link name="link">
-        <visual name="visual">
+    <model name='orange_bar_1'>
+      <static>1</static>
+      <pose>0 -6.774 1.4 0 -0 0</pose>
+      <link name='link'>
+        <visual name='visual'>
           <geometry>
-            <cylinder>
-              <radius>0.25</radius>
-              <length>1.20</length>
-            </cylinder>
+            <box>
+              <size>0.3 0.6 2.8</size>
+            </box>
           </geometry>
           <material>
-            <ambient>1.0 0.3 0.0 1.0</ambient>
-            <diffuse>1.0 0.3 0.0 1.0</diffuse>
+            <ambient>1 0.3 0 1</ambient>
+            <diffuse>1 0.3 0 1</diffuse>
           </material>
         </visual>
-        <collision name="collision">
+        <collision name='collision'>
           <geometry>
-            <cylinder>
-              <radius>0.25</radius>
-              <length>1.20</length>
-            </cylinder>
+            <box>
+              <size>0.3 0.6 2.8</size>
+            </box>
           </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
         </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
       </link>
     </model>
-
-    <!-- 圆柱 6 -->
-    <model name="orange_cylinder_6">
-      <static>true</static>
-      <pose>8.927 -0.772 0.60 0 0 0</pose>
-      <link name="link">
-        <visual name="visual">
+    <model name='orange_bar_2'>
+      <static>1</static>
+      <pose>6.066 -0.502 1.4 0 -0 0</pose>
+      <link name='link'>
+        <visual name='visual'>
           <geometry>
-            <cylinder>
-              <radius>0.25</radius>
-              <length>1.20</length>
-            </cylinder>
+            <box>
+              <size>0.3 0.6 2.8</size>
+            </box>
           </geometry>
           <material>
-            <ambient>1.0 0.3 0.0 1.0</ambient>
-            <diffuse>1.0 0.3 0.0 1.0</diffuse>
+            <ambient>1 0.3 0 1</ambient>
+            <diffuse>1 0.3 0 1</diffuse>
           </material>
         </visual>
-        <collision name="collision">
+        <collision name='collision'>
           <geometry>
-            <cylinder>
-              <radius>0.25</radius>
-              <length>1.20</length>
-            </cylinder>
+            <box>
+              <size>0.3 0.6 2.8</size>
+            </box>
           </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
         </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
       </link>
     </model>
-
-    <!-- 长条柱 1 -->
-    <model name="orange_bar_1">
-      <static>true</static>
-      <pose>2.949 -6.774 1.40 0 0 0</pose>
-      <link name="link">
-        <visual name="visual">
+    <model name='orange_bar_3'>
+      <static>1</static>
+      <pose>1 -10 1.4 0 -0 0</pose>
+      <link name='link'>
+        <visual name='visual'>
           <geometry>
-            <box><size>0.30 0.60 2.80</size></box>
+            <box>
+              <size>0.3 0.6 2.8</size>
+            </box>
           </geometry>
           <material>
-            <ambient>1.0 0.3 0.0 1.0</ambient>
-            <diffuse>1.0 0.3 0.0 1.0</diffuse>
+            <ambient>1 0.3 0 1</ambient>
+            <diffuse>1 0.3 0 1</diffuse>
           </material>
         </visual>
-        <collision name="collision">
+        <collision name='collision'>
           <geometry>
-            <box><size>0.30 0.60 2.80</size></box>
+            <box>
+              <size>0.3 0.6 2.8</size>
+            </box>
           </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
         </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
       </link>
     </model>
-
-    <!-- 长条柱 2 -->
-    <model name="orange_bar_2">
-      <static>true</static>
-      <pose>4.388 -9.860 1.40 0 0 0</pose>
-      <link name="link">
-        <visual name="visual">
-          <geometry>
-            <box><size>0.30 0.60 2.80</size></box>
-          </geometry>
-          <material>
-            <ambient>1.0 0.3 0.0 1.0</ambient>
-            <diffuse>1.0 0.3 0.0 1.0</diffuse>
-          </material>
-        </visual>
-        <collision name="collision">
-          <geometry>
-            <box><size>0.30 0.60 2.80</size></box>
-          </geometry>
-        </collision>
-      </link>
-    </model>
-
-    <!-- 长条柱 3 -->
-    <model name="orange_bar_3">
-      <static>true</static>
-      <pose>6.066 -0.502 1.40 0 0 0</pose>
-      <link name="link">
-        <visual name="visual">
-          <geometry>
-            <box><size>0.30 0.60 2.80</size></box>
-          </geometry>
-          <material>
-            <ambient>1.0 0.3 0.0 1.0</ambient>
-            <diffuse>1.0 0.3 0.0 1.0</diffuse>
-          </material>
-        </visual>
-        <collision name="collision">
-          <geometry>
-            <box><size>0.30 0.60 2.80</size></box>
-          </geometry>
-        </collision>
-      </link>
-    </model>
-
-    <!-- 长条柱 4 -->
-    <model name="orange_bar_4">
-      <static>true</static>
-      <pose>9.192 -12.022 1.40 0 0 0</pose>
-      <link name="link">
-        <visual name="visual">
-          <geometry>
-            <box><size>0.30 0.60 2.80</size></box>
-          </geometry>
-          <material>
-            <ambient>1.0 0.3 0.0 1.0</ambient>
-            <diffuse>1.0 0.3 0.0 1.0</diffuse>
-          </material>
-        </visual>
-        <collision name="collision">
-          <geometry>
-            <box><size>0.30 0.60 2.80</size></box>
-          </geometry>
-        </collision>
-      </link>
-    </model>
-
-    <!-- ==================== 四个太阳光源 ==================== -->
-    <!-- 移除默认的 sun 模型，改用四个定向光，模拟不同角度的日光 -->
-
-    <!-- 光源1：东北方向 -->
-    <light name="sun_northeast" type="directional">
-      <pose>0 0 10 0 0 0</pose>  <!-- 位置不影响方向光，仅用于可视化 -->
-      <direction>0.5 0.5 -1</direction>  <!-- 斜向照射原点 -->
-      <cast_shadows>true</cast_shadows>
+    <light name='sun_northeast' type='directional'>
+      <pose>0 0 10 0 -0 0</pose>
+      <direction>0.5 0.5 -1</direction>
+      <cast_shadows>1</cast_shadows>
       <diffuse>0.8 0.8 0.8 1</diffuse>
       <specular>0.2 0.2 0.2 1</specular>
       <attenuation>
         <range>100</range>
-        <constant>1.0</constant>
-        <linear>0.0</linear>
-        <quadratic>0.0</quadratic>
+        <constant>1</constant>
+        <linear>0</linear>
+        <quadratic>0</quadratic>
       </attenuation>
+      <spot>
+        <inner_angle>0</inner_angle>
+        <outer_angle>0</outer_angle>
+        <falloff>0</falloff>
+      </spot>
     </light>
-
-    <!-- 光源2：西北方向 -->
-    <light name="sun_northwest" type="directional">
-      <pose>0 0 10 0 0 0</pose>
+    <light name='sun_northwest' type='directional'>
+      <pose>0 0 10 0 -0 0</pose>
       <direction>-0.5 0.5 -1</direction>
-      <cast_shadows>false</cast_shadows>
+      <cast_shadows>0</cast_shadows>
       <diffuse>0.15 0.15 0.15 1</diffuse>
       <specular>0.05 0.05 0.05 1</specular>
       <attenuation>
         <range>100</range>
-        <constant>1.0</constant>
-        <linear>0.0</linear>
-        <quadratic>0.0</quadratic>
+        <constant>1</constant>
+        <linear>0</linear>
+        <quadratic>0</quadratic>
       </attenuation>
+      <spot>
+        <inner_angle>0</inner_angle>
+        <outer_angle>0</outer_angle>
+        <falloff>0</falloff>
+      </spot>
     </light>
-
-    <!-- 光源3：东南方向 -->
-    <light name="sun_southeast" type="directional">
-      <pose>0 0 10 0 0 0</pose>
+    <light name='sun_southeast' type='directional'>
+      <pose>0 0 10 0 -0 0</pose>
       <direction>0.5 -0.5 -1</direction>
-      <cast_shadows>false</cast_shadows>
+      <cast_shadows>0</cast_shadows>
       <diffuse>0.15 0.15 0.15 1</diffuse>
       <specular>0.05 0.05 0.05 1</specular>
       <attenuation>
         <range>100</range>
-        <constant>1.0</constant>
-        <linear>0.0</linear>
-        <quadratic>0.0</quadratic>
+        <constant>1</constant>
+        <linear>0</linear>
+        <quadratic>0</quadratic>
       </attenuation>
+      <spot>
+        <inner_angle>0</inner_angle>
+        <outer_angle>0</outer_angle>
+        <falloff>0</falloff>
+      </spot>
     </light>
-
-    <!-- 光源4：西南方向 -->
-    <light name="sun_southwest" type="directional">
-      <pose>0 0 10 0 0 0</pose>
+    <light name='sun_southwest' type='directional'>
+      <pose>0 0 10 0 -0 0</pose>
       <direction>-0.5 -0.5 -1</direction>
-      <cast_shadows>false</cast_shadows>
+      <cast_shadows>0</cast_shadows>
       <diffuse>0.15 0.15 0.15 1</diffuse>
       <specular>0.05 0.05 0.05 1</specular>
       <attenuation>
         <range>100</range>
-        <constant>1.0</constant>
-        <linear>0.0</linear>
-        <quadratic>0.0</quadratic>
+        <constant>1</constant>
+        <linear>0</linear>
+        <quadratic>0</quadratic>
       </attenuation>
+      <spot>
+        <inner_angle>0</inner_angle>
+        <outer_angle>0</outer_angle>
+        <falloff>0</falloff>
+      </spot>
     </light>
-
-    <!-- ==================== 深灰色围墙 ==================== -->
-    <!-- 墙体尺寸：高5m，厚0.3m，深灰色（RGB约0.3,0.3,0.3） -->
-    <!--
-      当前墙体中心线范围：X [-10, 10]、Y [-12.5, 12.5]。
-      因墙厚为0.3m，外轮廓约为20.3m x 25.3m，墙内净空约为19.7m x 24.7m。
-      如需导航区域严格为20m x 25m，应将墙中心分别放到 +/-10.15m、+/-12.65m。
-    -->
-
-    <!-- X正方向墙 -->
-    <model name="wall_north">
-      <static>true</static>
-      <pose>10 0 2.5 0 0 0</pose>
-      <link name="link">
-        <visual name="visual">
+    <light name='directional_east' type='directional'>
+      <pose>0 0 10 0 -0 0</pose>
+      <direction>-1 0 -1</direction>
+      <cast_shadows>0</cast_shadows>
+      <diffuse>0.06 0.06 0.06 1</diffuse>
+      <specular>0.02 0.02 0.02 1</specular>
+    </light>
+    <light name='directional_west' type='directional'>
+      <pose>0 0 10 0 -0 0</pose>
+      <direction>1 0 -1</direction>
+      <cast_shadows>0</cast_shadows>
+      <diffuse>0.06 0.06 0.06 1</diffuse>
+      <specular>0.02 0.02 0.02 1</specular>
+    </light>
+    <light name='directional_north' type='directional'>
+      <pose>0 0 10 0 -0 0</pose>
+      <direction>0 -1 -1</direction>
+      <cast_shadows>0</cast_shadows>
+      <diffuse>0.06 0.06 0.06 1</diffuse>
+      <specular>0.02 0.02 0.02 1</specular>
+    </light>
+    <light name='directional_south' type='directional'>
+      <pose>0 0 10 0 -0 0</pose>
+      <direction>0 1 -1</direction>
+      <cast_shadows>0</cast_shadows>
+      <diffuse>0.06 0.06 0.06 1</diffuse>
+      <specular>0.02 0.02 0.02 1</specular>
+    </light>
+    <model name='wall_north'>
+      <static>1</static>
+      <pose>10 0 2.5 0 -0 0</pose>
+      <link name='link'>
+        <visual name='visual'>
           <geometry>
-            <box><size>0.3 25.0 5.0</size></box>
+            <box>
+              <size>0.3 25 5</size>
+            </box>
           </geometry>
           <material>
-            <ambient>0.25 0.25 0.25 1.0</ambient>
-            <diffuse>0.35 0.35 0.35 1.0</diffuse>
-            <specular>0.1 0.1 0.1 1.0</specular>
+            <ambient>0.25 0.25 0.25 1</ambient>
+            <diffuse>0.35 0.35 0.35 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
           </material>
         </visual>
-        <collision name="collision">
+        <collision name='collision'>
           <geometry>
-            <box><size>0.3 25.0 5.0</size></box>
+            <box>
+              <size>0.3 25 5</size>
+            </box>
           </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
         </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
       </link>
     </model>
-
-    <!-- X负方向墙 -->
-    <model name="wall_south">
-      <static>true</static>
-      <pose>-10 0 2.5 0 0 0</pose>
-      <link name="link">
-        <visual name="visual">
+    <model name='wall_south'>
+      <static>1</static>
+      <pose>-10 0 2.5 0 -0 0</pose>
+      <link name='link'>
+        <visual name='visual'>
           <geometry>
-            <box><size>0.3 25.0 5.0</size></box>
+            <box>
+              <size>0.3 25 5</size>
+            </box>
           </geometry>
           <material>
-            <ambient>0.25 0.25 0.25 1.0</ambient>
-            <diffuse>0.35 0.35 0.35 1.0</diffuse>
-            <specular>0.1 0.1 0.1 1.0</specular>
+            <ambient>0.25 0.25 0.25 1</ambient>
+            <diffuse>0.35 0.35 0.35 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
           </material>
         </visual>
-        <collision name="collision">
+        <collision name='collision'>
           <geometry>
-            <box><size>0.3 25.0 5.0</size></box>
+            <box>
+              <size>0.3 25 5</size>
+            </box>
           </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
         </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
       </link>
     </model>
-
-    <!-- Y正方向墙 -->
-    <model name="wall_east">
-      <static>true</static>
-      <pose>0 12.5 2.5 0 0 0</pose>
-      <link name="link">
-        <visual name="visual">
+    <model name='wall_east'>
+      <static>1</static>
+      <pose>0 12.5 2.5 0 -0 0</pose>
+      <link name='link'>
+        <visual name='visual'>
           <geometry>
-            <box><size>20.0 0.3 5.0</size></box>
+            <box>
+              <size>20 0.3 5</size>
+            </box>
           </geometry>
           <material>
-            <ambient>0.25 0.25 0.25 1.0</ambient>
-            <diffuse>0.35 0.35 0.35 1.0</diffuse>
-            <specular>0.1 0.1 0.1 1.0</specular>
+            <ambient>0.25 0.25 0.25 1</ambient>
+            <diffuse>0.35 0.35 0.35 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
           </material>
         </visual>
-        <collision name="collision">
+        <collision name='collision'>
           <geometry>
-            <box><size>20.0 0.3 5.0</size></box>
+            <box>
+              <size>20 0.3 5</size>
+            </box>
           </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
         </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
       </link>
     </model>
-
-    <!-- Y负方向墙 -->
-    <model name="wall_west">
-      <static>true</static>
-      <pose>0 -12.5 2.5 0 0 0</pose>
-      <link name="link">
-        <visual name="visual">
+    <model name='wall_west'>
+      <static>1</static>
+      <pose>0 -12.5 2.5 0 -0 0</pose>
+      <link name='link'>
+        <visual name='visual'>
           <geometry>
-            <box><size>20.0 0.3 5.0</size></box>
+            <box>
+              <size>20 0.3 5</size>
+            </box>
           </geometry>
           <material>
-            <ambient>0.25 0.25 0.25 1.0</ambient>
-            <diffuse>0.35 0.35 0.35 1.0</diffuse>
-            <specular>0.1 0.1 0.1 1.0</specular>
+            <ambient>0.25 0.25 0.25 1</ambient>
+            <diffuse>0.35 0.35 0.35 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
           </material>
         </visual>
-        <collision name="collision">
+        <collision name='collision'>
           <geometry>
-            <box><size>20.0 0.3 5.0</size></box>
+            <box>
+              <size>20 0.3 5</size>
+            </box>
           </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
         </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+    </model>
+    <magnetic_field>6e-06 2.3e-05 -4.2e-05</magnetic_field>
+    <atmosphere type='adiabatic'/>
+    <wind/>
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <latitude_deg>0</latitude_deg>
+      <longitude_deg>0</longitude_deg>
+      <elevation>0</elevation>
+      <heading_deg>0</heading_deg>
+    </spherical_coordinates>
+    <model name='orange_cylinder_4'>
+      <static>1</static>
+      <pose>-8.05046 0.013651 0.6 0 -0 0</pose>
+      <link name='link'>
+        <visual name='visual'>
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.2</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>1 0.3 0 1</ambient>
+            <diffuse>1 0.3 0 1</diffuse>
+          </material>
+        </visual>
+        <collision name='collision'>
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.2</length>
+            </cylinder>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+    </model>
+    <model name='orange_bar_4'>
+      <static>1</static>
+      <pose>-5.44236 -1.5277 1.4 0 -0 0</pose>
+      <link name='link'>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.3 0.6 2.8</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 0.3 0 1</ambient>
+            <diffuse>1 0.3 0 1</diffuse>
+          </material>
+        </visual>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.3 0.6 2.8</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+    </model>
+    <model name='orange_bar_5'>
+      <static>1</static>
+      <pose>-1.56311 -3.51188 1.4 0 -0 0</pose>
+      <link name='link'>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.3 0.6 2.8</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 0.3 0 1</ambient>
+            <diffuse>1 0.3 0 1</diffuse>
+          </material>
+        </visual>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.3 0.6 2.8</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+    </model>
+    <model name='orange_bar_6'>
+      <static>1</static>
+      <pose>5.005875 -9.073792 1.4 0 -0 0</pose>
+      <link name='link'>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.3 0.6 2.8</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 0.3 0 1</ambient>
+            <diffuse>1 0.3 0 1</diffuse>
+          </material>
+        </visual>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.3 0.6 2.8</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+    </model>
+    <model name='orange_cylinder_5'>
+      <static>1</static>
+      <pose>-6.44653 9.49878 0.6 0 -0 0</pose>
+      <link name='link'>
+        <visual name='visual'>
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.2</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>1 0.3 0 1</ambient>
+            <diffuse>1 0.3 0 1</diffuse>
+          </material>
+        </visual>
+        <collision name='collision'>
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.2</length>
+            </cylinder>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+    </model>
+    <model name='orange_bar_7'>
+      <static>1</static>
+      <pose>-1.47945 5.51133 1.4 0 -0 0</pose>
+      <link name='link'>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.3 0.6 2.8</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 0.3 0 1</ambient>
+            <diffuse>1 0.3 0 1</diffuse>
+          </material>
+        </visual>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.3 0.6 2.8</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+    </model>
+    <model name='orange_cylinder_6'>
+      <static>1</static>
+      <pose>1.43793 9.60785 0.6 0 -0 0</pose>
+      <link name='link'>
+        <visual name='visual'>
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.2</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>1 0.3 0 1</ambient>
+            <diffuse>1 0.3 0 1</diffuse>
+          </material>
+        </visual>
+        <collision name='collision'>
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.2</length>
+            </cylinder>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+    </model>
+    <model name='orange_cylinder_7'>
+      <static>1</static>
+      <pose>-4.99176 -10.8953 0.6 0 -0 0</pose>
+      <link name='link'>
+        <visual name='visual'>
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.2</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>1 0.3 0 1</ambient>
+            <diffuse>1 0.3 0 1</diffuse>
+          </material>
+        </visual>
+        <collision name='collision'>
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.2</length>
+            </cylinder>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+    </model>
+    <model name='orange_cylinder_8'>
+      <static>1</static>
+      <pose>8.01234 3.51559 0.6 0 -0 0</pose>
+      <link name='link'>
+        <visual name='visual'>
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.2</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>1 0.3 0 1</ambient>
+            <diffuse>1 0.3 0 1</diffuse>
+          </material>
+        </visual>
+        <collision name='collision'>
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.2</length>
+            </cylinder>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
       </link>
     </model>
 
