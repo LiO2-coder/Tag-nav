@@ -248,4 +248,162 @@
     </gazebo>
   </xacro:macro>
 
+  <!--
+    Downward-facing fisheye camera. The link frame is located at the lens
+    plane, with +X pointing along the optical axis. The camera body extends
+    toward -X so it can be recessed into the chassis while the lens remains
+    flush with the underside.
+  -->
+  <xacro:macro
+    name="bottom_fisheye_camera"
+    params="name topic_name x y mount_z namespace update_rate image_width image_height horizontal_fov lens_cutoff near_clip far_clip">
+    <xacro:property name="bottom_body_depth" value="0.045"/>
+    <xacro:property name="bottom_body_width" value="0.080"/>
+    <xacro:property name="bottom_body_height" value="0.080"/>
+    <xacro:property name="bottom_lens_radius" value="0.025"/>
+    <xacro:property name="bottom_lens_depth" value="0.004"/>
+    <xacro:property name="bottom_light_radius" value="0.032"/>
+
+    <link name="${name}_link">
+      <visual>
+        <origin xyz="${-bottom_body_depth / 2.0} 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${bottom_body_depth} ${bottom_body_width} ${bottom_body_height}"/>
+        </geometry>
+        <material name="sensor_gray"/>
+      </visual>
+      <visual>
+        <origin xyz="${-bottom_lens_depth / 2.0} 0 0" rpy="0 ${pi / 2.0} 0"/>
+        <geometry>
+          <cylinder radius="${bottom_lens_radius}" length="${bottom_lens_depth}"/>
+        </geometry>
+        <material name="lens_glass"/>
+      </visual>
+      <collision>
+        <origin xyz="${-bottom_body_depth / 2.0} 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="${bottom_body_depth} ${bottom_body_width} ${bottom_body_height}"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <origin xyz="${-bottom_body_depth / 2.0} 0 0" rpy="0 0 0"/>
+        <mass value="0.20"/>
+        <inertia
+          ixx="${0.20 * (bottom_body_width * bottom_body_width + bottom_body_height * bottom_body_height) / 12.0}"
+          ixy="0.0"
+          ixz="0.0"
+          iyy="${0.20 * (bottom_body_depth * bottom_body_depth + bottom_body_height * bottom_body_height) / 12.0}"
+          iyz="0.0"
+          izz="${0.20 * (bottom_body_depth * bottom_body_depth + bottom_body_width * bottom_body_width) / 12.0}"/>
+      </inertial>
+    </link>
+
+    <gazebo reference="${name}_link">
+      <material>Gazebo/Grey</material>
+      <preserveFixedJoint>true</preserveFixedJoint>
+
+      <sensor name="${name}_sensor" type="wideanglecamera">
+        <always_on>true</always_on>
+        <update_rate>${update_rate}</update_rate>
+        <camera name="${name}">
+          <horizontal_fov>${horizontal_fov}</horizontal_fov>
+          <image>
+            <width>${image_width}</width>
+            <height>${image_height}</height>
+            <format>R8G8B8</format>
+          </image>
+          <clip>
+            <near>${near_clip}</near>
+            <far>${far_clip}</far>
+          </clip>
+          <lens>
+            <type>equidistant</type>
+            <scale_to_hfov>true</scale_to_hfov>
+            <cutoff_angle>${lens_cutoff}</cutoff_angle>
+            <env_texture_size>512</env_texture_size>
+          </lens>
+        </camera>
+        <plugin name="${name}_camera_plugin" filename="libgazebo_ros_camera.so">
+          <robotNamespace>${namespace}/camera</robotNamespace>
+          <alwaysOn>true</alwaysOn>
+          <updateRate>${update_rate}</updateRate>
+          <cameraName>${topic_name}</cameraName>
+          <imageTopicName>image_raw</imageTopicName>
+          <cameraInfoTopicName>camera_info</cameraInfoTopicName>
+          <frameName>${name}_optical_frame</frameName>
+          <hackBaseline>0.0</hackBaseline>
+          <distortionK1>0.0</distortionK1>
+          <distortionK2>0.0</distortionK2>
+          <distortionK3>0.0</distortionK3>
+          <distortionT1>0.0</distortionT1>
+          <distortionT2>0.0</distortionT2>
+        </plugin>
+      </sensor>
+
+      <!-- Four invisible white point lights approximate an annular illuminator. -->
+      <light name="${name}_ring_light_front" type="point">
+        <pose>0 ${bottom_light_radius} 0 0 0 0</pose>
+        <diffuse>1 1 1 1</diffuse>
+        <specular>1 1 1 1</specular>
+        <attenuation>
+          <range>1.5</range>
+          <constant>0.25</constant>
+          <linear>0.35</linear>
+          <quadratic>0.10</quadratic>
+        </attenuation>
+        <cast_shadows>false</cast_shadows>
+      </light>
+      <light name="${name}_ring_light_rear" type="point">
+        <pose>0 -${bottom_light_radius} 0 0 0 0</pose>
+        <diffuse>1 1 1 1</diffuse>
+        <specular>1 1 1 1</specular>
+        <attenuation>
+          <range>1.5</range>
+          <constant>0.25</constant>
+          <linear>0.35</linear>
+          <quadratic>0.10</quadratic>
+        </attenuation>
+        <cast_shadows>false</cast_shadows>
+      </light>
+      <light name="${name}_ring_light_left" type="point">
+        <pose>0 0 ${bottom_light_radius} 0 0 0</pose>
+        <diffuse>1 1 1 1</diffuse>
+        <specular>1 1 1 1</specular>
+        <attenuation>
+          <range>1.5</range>
+          <constant>0.25</constant>
+          <linear>0.35</linear>
+          <quadratic>0.10</quadratic>
+        </attenuation>
+        <cast_shadows>false</cast_shadows>
+      </light>
+      <light name="${name}_ring_light_right" type="point">
+        <pose>0 0 -${bottom_light_radius} 0 0 0</pose>
+        <diffuse>1 1 1 1</diffuse>
+        <specular>1 1 1 1</specular>
+        <attenuation>
+          <range>1.5</range>
+          <constant>0.25</constant>
+          <linear>0.35</linear>
+          <quadratic>0.10</quadratic>
+        </attenuation>
+        <cast_shadows>false</cast_shadows>
+      </light>
+    </gazebo>
+
+    <joint name="${name}_mount_joint" type="fixed">
+      <parent link="base_link"/>
+      <child link="${name}_link"/>
+      <!-- +X of the camera points straight down; the lens plane is flush with the chassis bottom. -->
+      <origin xyz="${x} ${y} ${mount_z}" rpy="0 ${pi / 2.0} 0"/>
+    </joint>
+
+    <joint name="${name}_optical_joint" type="fixed">
+      <parent link="${name}_link"/>
+      <child link="${name}_optical_frame"/>
+      <origin xyz="0 0 0" rpy="${-pi / 2.0} 0 ${-pi / 2.0}"/>
+    </joint>
+    <link name="${name}_optical_frame"/>
+  </xacro:macro>
+
 </robot>
