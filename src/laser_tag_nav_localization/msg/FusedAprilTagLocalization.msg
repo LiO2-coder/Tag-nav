@@ -1,0 +1,12 @@
+std_msgs/Header header
+bool valid
+string localization_mode
+geometry_msgs/PoseWithCovarianceStamped pose
+string[] camera_names
+int32[] tag_ids
+float64[] qualities
+float64[] weights
+float64 quality_sum
+uint32 contributing_camera_count
+float64 processing_time_sec
+float64 localization_age_sec

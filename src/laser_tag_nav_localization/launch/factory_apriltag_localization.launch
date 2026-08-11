@@ -1,0 +1,15 @@
+<launch>
+  <arg name="paused" default="false"/>
+  <arg name="gui" default="true"/>
+  <arg name="publish_tf" default=""/>
+  <arg name="debug_images" default=""/>
+
+  <include file="$(find laser-tag_nav_bringup)/launch/factory_gazebo.launch">
+    <arg name="paused" value="$(arg paused)"/>
+    <arg name="gui" value="$(arg gui)"/>
+  </include>
+  <include file="$(find laser_tag_nav_localization)/launch/apriltag_localization.launch">
+    <arg name="publish_tf" value="$(arg publish_tf)"/>
+    <arg name="debug_images" value="$(arg debug_images)"/>
+  </include>
+</launch>
