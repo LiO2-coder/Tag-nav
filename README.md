@@ -164,6 +164,172 @@ map -> odom -> base_footprint -> base_link -> sensors
 `factory_gazebo.launch` 的 `publish_odom_tf` 默认值为 `true`；使用 EKF 时应设为
 `false`，正如 `factory_apriltag_localization.launch` 的配置。
 
+## 联调故障复盘与已验证修复
+
+这一节记录本项目在 Gazebo 中实际复现、定位并修复过的问题。排查 TF 时，
+先确认“哪一个节点发布哪一条边”和“消息的时间戳/数据源”，再判断是不是
+AprilTag 算法问题。
+
+### 1. 修正模式的 TF 链和重复时间戳
+
+修正模式不是让 AprilTag 节点发布 `odom -> base_footprint`，而是保持以下职责：
+
+```text
+robot_localization:  /agv/odom + /agv/imu/data -> odom -> base_footprint
+AprilTag:            T_map_base * inverse(T_odom_base) -> map -> odom
+最终链路:             map -> odom -> base_footprint
+```
+
+定位模式才直接发布 `map -> base_footprint`。修正模式下，标签融合结果和
+`~pose` 仍然表示 `map` 下的 `base_footprint`，只有广播的 TF 子坐标系变为
+`odom`。`output.tf_mode` 与 `fusion.mode` 是两个不同概念：前者选择 TF 发布
+方式，后者选择 2D/2.5D/3D 位姿模型。
+
+早期出现过：
+
+```text
+TF_REPEATED_DATA ignoring data with redundant timestamp
+```
+
+原因是同一 parent/child 在仿真时间下被重复广播相同时间戳。现在发布前会对
+`parent + child + stamp` 做严格递增检查；仿真时间回退时清空检查状态，允许
+Gazebo 重新开始发布。该检查只影响 TF，不影响 `~localization` 和 `~pose`。
+
+### 2. 丢失 Tag 时为什么看起来像“里程计停了”
+
+没有 Tag 时，里程计仍应持续运行。之前看到 `map -> base_footprint` 停住，
+并不是 `odom -> base_footprint` 停止，而是旧的 `map -> odom` 时间戳限制了
+整条 TF 链的时间查询。
+
+现在 correction 模式在有效 Tag 到来时缓存最后一次 `T_map_odom`；丢 Tag 后：
+
+- 不重新计算、不伪造新的视觉观测；
+- 以当前时间戳重发缓存的 `map -> odom`；
+- `~localization.valid` 在定位超时后仍为 `false`；
+- `~pose` 不发布无效的视觉位姿；
+- `~localization.tf_status` 标记为 `correction_held`。
+
+因此 `map -> odom -> base_footprint` 可以继续随独立里程计变化，同时明确区分
+“TF 链仍可用”和“当前视觉定位仍然有效”。长时间没有 Tag 时，`map` 下的位置
+会随着里程计漂移，这是修正模式的正常语义，直到下一次有效 Tag 更新修正量。
+
+### 3. 手动拖动 Gazebo 模型导致 `odom` 跳变
+
+最重要的仿真问题是差速插件曾使用：
+
+```xml
+<odometrySource>world</odometrySource>
+```
+
+这会把 Gazebo 世界真值直接写入 `/agv/odom`。在 GUI 中拖动或通过
+`/gazebo/set_model_state` 瞬移模型时，世界真值也会瞬移，EKF 再忠实地把跳变
+传播到 `odom -> base_footprint`，看起来就像 AprilTag 反向修改了里程计。
+
+当前已改为：
+
+```xml
+<odometrySource>encoder</odometrySource>
+```
+
+并在 [ekf_odom.yaml](src/laser_tag_nav_localization/config/ekf_odom.yaml) 中关闭
+IMU 的绝对世界航向，只融合角速度等局部信息。这样手动改变 Gazebo 世界位姿时，
+没有对应的轮编码器/角速度运动，`odom -> base_footprint` 保持不变；视觉节点
+通过新的标签观测更新 `map -> odom`，从而修正组合后的 `map -> base_footprint`。
+
+实测瞬移约 1 m 后的预期结果是：
+
+```text
+odom -> base_footprint: 基本不变
+map  -> odom:           变化约 1 m
+map  -> base_footprint: 跟随全局标签修正
+```
+
+这也是判断 TF 方向是否正确的最小回归测试。需要注意，真实机器人必须提供
+编码器/里程计和 IMU；Gazebo 的 `encoder` 只解决仿真中不应使用世界真值的问题。
+
+### 4. 图像时间戳、同步等待与高速旋转误差
+
+同步器的 `wait_sec` 是“等待其他相机帧到达”的延迟，不是从图像测量时间戳
+中减去的时间。处理一帧时间为 `t` 的图像时，应在同一 `t` 查询
+`T_odom_base(t)`；若把图像时间错误地改为 `t - wait_sec`，运动中的机器人会
+产生额外的 `map -> odom` 假修正。当前同步逻辑还会：
+
+- 只选择不超过 `slop_sec` 的最近帧；
+- 跳过超过 `stale_frame_timeout_sec` 的帧；
+- 同时遵守 `process_rate_hz` 和 `min_batch_interval_sec`；
+- 允许部分相机参与，不会被缺失相机阻塞。
+
+高速原地旋转时仍可能看到小幅角度误差，主要来自图像采集、传输和检测延迟，
+不是 `map -> odom` 与 `odom -> base_footprint` 方向错误。应结合图像时间戳、
+`processing_time_sec` 和里程计时间戳一起判断。
+
+### 5. 下视鱼眼相机和地面 Tag 的坐标约定
+
+下视相机曾使用错误的焦距参数，导致距离和姿态不稳定。当前工厂配置中的
+`bottom` 鱼眼内参与 `robot.gazebo.xacro` 的相机模型保持一致，使用
+`equidistant` 分支整流后再进行 AprilTag 检测和 IPPE 方形 PnP。
+
+OpenCV `SOLVEPNP_IPPE_SQUARE` 对角点顺序有严格要求，而地面地图将 Tag 法向
+定义为 `+Z`。当前代码先按 OpenCV 要求解算并验证四个角点为正深度，再通过
+`diag(1, -1, -1)` 将 PnP Tag 坐标转换到地图的地面 Tag 坐标约定。修改相机
+内参、外参或地图 Tag 朝向时，必须重新检查正深度和 `T_map_tag` 的方向。
+
+### 6. Gazebo `joint_cmd` / discovery 警告
+
+下面的提示：
+
+```text
+Node::Advertise(): Error advertising topic [/warehouse_agv/joint_cmd]
+```
+
+来自 Gazebo Classic GUI 的 `JointControlWidget`，是 GUI 选中模型时为关节控制
+面板创建的 Gazebo Transport 内部话题，不是 ROS 话题，也不是 AprilTag、EKF 或
+TF 的发布失败。项目 URDF 中没有依赖这个话题；只要 `/agv/cmd_vel`、相机图像、
+`/agv/odom` 和 `/tf` 正常，该警告通常可以忽略。
+
+排查/规避方法：
+
+```bash
+# 不需要 Gazebo GUI 时，直接关闭 GUI，避免 JointControlWidget
+roslaunch laser_tag_nav_localization factory_apriltag_localization.launch gui:=false
+
+# 多网卡、VPN 或 Docker 环境下，指定双方可达的真实网卡地址
+export GAZEBO_IP=10.10.151.14
+export IGN_IP=10.10.151.14
+```
+
+不要把 `GAZEBO_IP`/`IGN_IP` 固定为 `127.0.0.1` 后再进行相机 Transport 联调：
+这可能使底部 wide-angle 相机的 Ignition 图像通道无法发现。远程联调时应使用
+Gazebo 服务端和客户端都能路由到的实际地址。`GAZEBO_MODEL_PATH` 中若包含地图
+图片等非模型文件，只会产生额外的路径提示，与 TF/定位无关。
+
+### 7. 推荐的故障定位顺序
+
+```bash
+# 1) 确认输入是否持续
+rostopic hz /agv/odom
+rostopic hz /agv/odometry/filtered
+rostopic hz /agv/camera/bottom/image_raw
+
+# 2) 确认 TF 的直接发布者和方向
+rosrun tf tf_echo odom base_footprint
+rosrun tf tf_echo map odom
+rosrun tf tf_echo map base_footprint
+rosrun tf view_frames
+
+# 3) 查看 AprilTag 状态，区分视觉无效与 TF 不可用
+rostopic echo /apriltag_localization/localization
+
+# 4) 确认同一条 TF 没有多个动态发布者
+rostopic info /tf
+rosnode info /agv_ekf_odom
+rosnode info /apriltag_localization
+```
+
+判断原则是：`odom -> base_footprint` 只应由 EKF 发布；修正模式下 AprilTag 只应
+发布 `map -> odom`；`map -> base_footprint` 是两者组合结果，不应直接拿它的
+冻结/跳动来推断里程计是否工作。
+
 ## 静态地图（map_server）
 
 地图文件位于：
