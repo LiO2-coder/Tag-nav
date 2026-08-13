@@ -27,6 +27,7 @@
 #include <sensor_msgs/image_encodings.h>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_datatypes.h>
+#include <tf/transform_listener.h>
 
 #include <apriltag/apriltag.h>
 #include <apriltag/common/zarray.h>
@@ -309,6 +310,32 @@ void poseFromTransform(const Matrix4& transform, geometry_msgs::Pose& pose)
   pose.orientation.w = quaternion.w();
 }
 
+Matrix4 matrixFromTf(const tf::Transform& transform)
+{
+  Matrix4 result = Matrix4::eye();
+  const tf::Matrix3x3 basis = transform.getBasis();
+  const tf::Vector3 origin = transform.getOrigin();
+  for (int row = 0; row < 3; ++row)
+    for (int col = 0; col < 3; ++col)
+      result(row, col) = basis[row][col];
+  result(0, 3) = origin.x();
+  result(1, 3) = origin.y();
+  result(2, 3) = origin.z();
+  return result;
+}
+
+tf::Transform tfFromMatrix(const Matrix4& transform)
+{
+  tf::Matrix3x3 basis(
+      transform(0, 0), transform(0, 1), transform(0, 2),
+      transform(1, 0), transform(1, 1), transform(1, 2),
+      transform(2, 0), transform(2, 1), transform(2, 2));
+  tf::Quaternion rotation;
+  basis.getRotation(rotation);
+  return tf::Transform(rotation,
+                       tf::Vector3(transform(0, 3), transform(1, 3), transform(2, 3)));
+}
+
 tf::Quaternion quaternionFromTransform(const Matrix4& transform)
 {
   tf::Matrix3x3 rotation(
@@ -477,8 +504,11 @@ private:
     min_yaw_stddev_ = jsonDouble(fusion, "min_yaw_stddev_rad", 0.035);
     parseFusionConfiguration(fusion);
     map_frame_ = jsonString(output, "map_frame", "map");
+    odom_frame_ = jsonString(output, "odom_frame", "odom");
     base_frame_ = jsonString(output, "base_frame", "base_footprint");
+    tf_mode_ = jsonString(output, "tf_mode", "localization");
     publish_tf_ = jsonBool(output, "publish_tf", false);
+    tf_lookup_timeout_ = jsonDouble(output, "tf_lookup_timeout_sec", 0.05);
     debug_images_ = jsonBool(output, "debug_images", false);
     invalid_variance_ = jsonDouble(output, "invalid_variance", 1e6);
 
@@ -507,8 +537,11 @@ private:
     pnh_.param("stale_frame_timeout", stale_frame_timeout_, stale_frame_timeout_);
     pnh_.param("queue_size", queue_size_, queue_size_);
     pnh_.param("map_frame", map_frame_, map_frame_);
+    pnh_.param("odom_frame", odom_frame_, odom_frame_);
     pnh_.param("base_frame", base_frame_, base_frame_);
+    pnh_.param("tf_mode", tf_mode_, tf_mode_);
     pnh_.param("publish_tf", publish_tf_, publish_tf_);
+    pnh_.param("tf_lookup_timeout", tf_lookup_timeout_, tf_lookup_timeout_);
     pnh_.param("debug_images", debug_images_, debug_images_);
     pnh_.param("area_reference_px", area_reference_px_, area_reference_px_);
     pnh_.param("margin_reference", margin_reference_, margin_reference_);
@@ -528,6 +561,16 @@ private:
     if (localization_mode_ != "auto" && localization_mode_ != "2d" &&
         localization_mode_ != "2.5d" && localization_mode_ != "3d")
       throw std::runtime_error("fusion_mode must be auto, 2d, 2.5d or 3d");
+
+    if (tf_mode_ != "localization" && tf_mode_ != "correction")
+      throw std::runtime_error("tf_mode must be localization or correction");
+    if (map_frame_.empty() || odom_frame_.empty() || base_frame_.empty())
+      throw std::runtime_error("map_frame, odom_frame and base_frame cannot be empty");
+    if (tf_mode_ == "correction" &&
+        (map_frame_ == odom_frame_ || map_frame_ == base_frame_ || odom_frame_ == base_frame_))
+      throw std::runtime_error("map, odom and base frames must be distinct in correction mode");
+    if (tf_lookup_timeout_ < 0.0)
+      throw std::runtime_error("tf_lookup_timeout must be non-negative");
 
     if (process_rate_ <= 0.0 || sync_slop_ < 0.0 || sync_wait_ < 0.0 || queue_size_ <= 0 ||
         localization_timeout_ < 0.0 || stale_frame_timeout_ < 0.0 || min_batch_interval_ < 0.0)
@@ -810,6 +853,9 @@ private:
     candidate.tag_id = detection->id;
     candidate.hamming = detection->hamming;
 
+    // Keep the exact IPPE_SQUARE object-point order required by OpenCV. AprilTag
+    // corners are counter-clockwise in image coordinates (+Y down), so this
+    // PnP tag frame has its normal opposite to the map's +Z-up ground-tag frame.
     std::vector<cv::Point3d> object_points{
         cv::Point3d(-map_it->second.size / 2.0,  map_it->second.size / 2.0, 0.0),
         cv::Point3d( map_it->second.size / 2.0,  map_it->second.size / 2.0, 0.0),
@@ -846,6 +892,13 @@ private:
       if (z <= 1e-6)
         return false;
     }
+
+    // map_to_tag uses +Z as the upward floor normal. Convert from the IPPE
+    // tag frame to that map tag frame only after positive-depth validation.
+    Matrix4 pnp_tag_to_map_tag = Matrix4::eye();
+    pnp_tag_to_map_tag(1, 1) = -1.0;
+    pnp_tag_to_map_tag(2, 2) = -1.0;
+    candidate.camera_to_tag = candidate.camera_to_tag * pnp_tag_to_map_tag;
 
     candidate.scores.area_px = polygonArea(candidate.corners);
     if (min_tag_area_px_ > 0.0 && candidate.scores.area_px < min_tag_area_px_)
@@ -915,28 +968,42 @@ private:
     return best_delta <= sync_slop_ ? best : sensor_msgs::ImageConstPtr();
   }
 
+  bool latestEligibleAnchor(const ros::Time& cutoff, ros::Time& anchor) const
+  {
+    bool have_anchor = false;
+    for (const CameraConfig& camera : cameras_)
+    {
+      if (!camera.enabled)
+        continue;
+      for (auto frame_it = camera.queue.rbegin(); frame_it != camera.queue.rend(); ++frame_it)
+      {
+        const ros::Time stamp = (*frame_it)->header.stamp;
+        if (stamp.isZero() || stamp > cutoff)
+          continue;
+        if (!have_anchor || stamp > anchor)
+        {
+          anchor = stamp;
+          have_anchor = true;
+        }
+        break;
+      }
+    }
+    return have_anchor;
+  }
+
   void syncTimer(const ros::TimerEvent&)
   {
     const ros::Time now = ros::Time::now();
-    ros::Time newest;
-    bool have_frame = false;
-    for (const CameraConfig& camera : cameras_)
-    {
-      if (!camera.enabled || camera.queue.empty())
-        continue;
-      const ros::Time stamp = camera.queue.back()->header.stamp;
-      if (!have_frame || stamp > newest)
-      {
-        newest = stamp;
-        have_frame = true;
-      }
-    }
-    if (!have_frame)
+    // The wait is an arrival delay, not an offset applied to the measurement
+    // timestamp. Processing an image at t with odometry from t-wait produces
+    // a false map->odom correction whenever the base is moving.
+    const ros::Time cutoff = now - ros::Duration(sync_wait_);
+    ros::Time target;
+    if (!latestEligibleAnchor(cutoff, target))
     {
       publishTimeoutState(now);
       return;
     }
-    const ros::Time target = newest - ros::Duration(sync_wait_);
     if (!last_processed_stamp_.isZero() && target <= last_processed_stamp_)
     {
       publishTimeoutState(now);
@@ -1008,6 +1075,14 @@ private:
       {
         last_processing_time_sec_ = 0.0;
         publishResults(now, std::vector<CameraResult>());
+      }
+      else
+      {
+        // Keep the last map->odom correction temporally valid while the
+        // visual localization status is still within its timeout window.
+        // This does not change the correction value or report a new visual
+        // observation; it only lets odom->base continue to compose in TF.
+        publishHeldCorrection(nullptr);
       }
     }
   }
@@ -1281,16 +1356,12 @@ private:
       localization.pose.pose.covariance[35] = yaw_variance;
       last_valid_stamp_ = stamp;
       localization.localization_age_sec = 0.0;
+      const Matrix4 map_to_base = matrixFromTf(tf::Transform(
+          fused_quaternion,
+          tf::Vector3(x, y, localization_mode_ == "2d" ? 0.0 : z)));
+      publishFusedTf(map_to_base, stamp, localization);
       localization_publisher_.publish(localization);
       pose_publisher_.publish(localization.pose);
-      if (publish_tf_)
-      {
-        tf::Transform transform;
-        transform.setOrigin(tf::Vector3(x, y, localization_mode_ == "2d" ? 0.0 : z));
-        transform.setRotation(fused_quaternion);
-        tf_broadcaster_.sendTransform(tf::StampedTransform(
-            transform, stamp, map_frame_, base_frame_));
-      }
     }
     else
     {
@@ -1300,6 +1371,23 @@ private:
       localization.pose.pose.covariance[21] = invalid_variance_;
       localization.pose.pose.covariance[28] = invalid_variance_;
       localization.pose.pose.covariance[35] = invalid_variance_;
+      localization.tf_published = false;
+      localization.tf_parent_frame = map_frame_;
+      localization.tf_child_frame = tf_mode_ == "correction" ? odom_frame_ : base_frame_;
+      if (!publish_tf_)
+      {
+        localization.tf_status = "disabled";
+      }
+      else if (tf_mode_ == "correction" && have_map_to_odom_)
+      {
+        // Invalid means no current visual observation. It must not stop the
+        // independent odometry chain from being usable in the map frame.
+        publishHeldCorrection(&localization);
+      }
+      else
+      {
+        localization.tf_status = "no_valid_pose";
+      }
       localization_publisher_.publish(localization);
     }
   }
@@ -1307,6 +1395,92 @@ private:
   double base_position_variance() const
   {
     return min_position_stddev_ * min_position_stddev_;
+  }
+
+  void publishFusedTf(const Matrix4& map_to_base, const ros::Time& stamp,
+                      FusedAprilTagLocalization& localization)
+  {
+    localization.tf_published = false;
+    localization.tf_parent_frame = map_frame_;
+    localization.tf_child_frame = tf_mode_ == "correction" ? odom_frame_ : base_frame_;
+    if (!publish_tf_)
+    {
+      localization.tf_status = "disabled";
+      return;
+    }
+
+    Matrix4 transform = map_to_base;
+    if (tf_mode_ == "correction")
+    {
+      tf::StampedTransform odom_to_base;
+      try
+      {
+        tf_listener_.waitForTransform(
+            odom_frame_, base_frame_, stamp, ros::Duration(tf_lookup_timeout_));
+        tf_listener_.lookupTransform(odom_frame_, base_frame_, stamp, odom_to_base);
+      }
+      catch (const tf::TransformException& error)
+      {
+        localization.tf_status = "odom_base_unavailable";
+        ROS_WARN_THROTTLE(2.0,
+                          "unable to compute map->odom from odom->base at %.3f: %s",
+                          stamp.toSec(), error.what());
+        return;
+      }
+      transform = map_to_base * inverseRigid(matrixFromTf(odom_to_base));
+      last_map_to_odom_ = transform;
+      have_map_to_odom_ = true;
+
+      // The correction is evaluated from transforms at the image stamp, but
+      // map->odom is a global correction. Publish it at the current TF time
+      // so a preceding held transform cannot make the timestamp go backwards.
+      publishTransform(transform, ros::Time::now(), localization);
+      return;
+    }
+
+    publishTransform(transform, stamp, localization);
+  }
+
+  void publishHeldCorrection(FusedAprilTagLocalization* localization)
+  {
+    if (!publish_tf_ || tf_mode_ != "correction" || !have_map_to_odom_)
+      return;
+
+    FusedAprilTagLocalization held_status;
+    FusedAprilTagLocalization& status = localization ? *localization : held_status;
+    status.tf_published = false;
+    status.tf_parent_frame = map_frame_;
+    status.tf_child_frame = odom_frame_;
+    publishTransform(last_map_to_odom_, ros::Time::now(), status, "correction_held");
+  }
+
+  void publishTransform(const Matrix4& transform, const ros::Time& stamp,
+                        FusedAprilTagLocalization& localization,
+                        const std::string& success_status = "published")
+  {
+    if (stamp < last_tf_stamp_)
+    {
+      ROS_WARN_THROTTLE(2.0, "TF timestamp moved backwards; resetting TF timestamp guard");
+      last_tf_stamp_ = ros::Time(0);
+      last_tf_parent_.clear();
+      last_tf_child_.clear();
+    }
+    if (!last_tf_stamp_.isZero() && stamp <= last_tf_stamp_ &&
+        localization.tf_parent_frame == last_tf_parent_ &&
+        localization.tf_child_frame == last_tf_child_)
+    {
+      localization.tf_status = "duplicate_timestamp_skipped";
+      return;
+    }
+
+    tf_broadcaster_.sendTransform(tf::StampedTransform(
+        tfFromMatrix(transform), stamp, localization.tf_parent_frame,
+        localization.tf_child_frame));
+    last_tf_stamp_ = stamp;
+    last_tf_parent_ = localization.tf_parent_frame;
+    last_tf_child_ = localization.tf_child_frame;
+    localization.tf_published = true;
+    localization.tf_status = success_status;
   }
 
   ros::NodeHandle nh_;
@@ -1320,6 +1494,7 @@ private:
   ros::Publisher localization_publisher_;
   ros::Publisher pose_publisher_;
   tf::TransformBroadcaster tf_broadcaster_;
+  tf::TransformListener tf_listener_;
 
   FamilyHandle family_;
   apriltag_detector_t* detector_ = nullptr;
@@ -1334,7 +1509,9 @@ private:
   std::map<std::string, double> camera_confidence_multipliers_;
   std::string tag_family_;
   std::string map_frame_;
+  std::string odom_frame_;
   std::string base_frame_;
+  std::string tf_mode_ = "localization";
   int tag_threads_ = 2;
   int max_hamming_dist_ = 0;
   int tag_refine_edges_ = 1;
@@ -1356,6 +1533,7 @@ private:
   double min_position_stddev_ = 0.02;
   double min_yaw_stddev_ = 0.035;
   double invalid_variance_ = 1e6;
+  double tf_lookup_timeout_ = 0.05;
   double min_tag_area_px_ = 0.0;
   double max_tag_range_m_ = 0.0;
   double outlier_position_threshold_ = 0.30;
@@ -1371,6 +1549,11 @@ private:
   ros::Time last_batch_time_;
   ros::Time last_valid_stamp_;
   ros::Time last_timeout_publish_time_;
+  ros::Time last_tf_stamp_;
+  std::string last_tf_parent_;
+  std::string last_tf_child_;
+  Matrix4 last_map_to_odom_ = Matrix4::eye();
+  bool have_map_to_odom_ = false;
 };
 
 }  // namespace laser_tag_nav_localization

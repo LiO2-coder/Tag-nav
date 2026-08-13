@@ -56,8 +56,11 @@
   },
   "output": {
     "map_frame": "map",
+    "odom_frame": "odom",
     "base_frame": "base_footprint",
+    "tf_mode": "correction",
     "publish_tf": true,
+    "tf_lookup_timeout_sec": 0.05,
     "debug_images": true,
     "invalid_variance": 1000000.0
   },

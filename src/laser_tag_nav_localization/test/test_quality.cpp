@@ -8,6 +8,7 @@
 #include <laser_tag_nav_localization/quality_math.h>
 
 using laser_tag_nav_localization::geometricQuality;
+using laser_tag_nav_localization::correctionTransform;
 using laser_tag_nav_localization::normalizedQualityExponents;
 using laser_tag_nav_localization::quadrilateralDistortionError;
 using laser_tag_nav_localization::validQualityMask;
@@ -59,4 +60,38 @@ TEST(QualityMath, QualityMaskNormalizesEnabledMetrics)
   EXPECT_NEAR(exponents[2], 0.75, 1e-12);
   EXPECT_DOUBLE_EQ(exponents[3], 0.0);
   EXPECT_NEAR(exponents[0] + exponents[2], 1.0, 1e-12);
+}
+
+TEST(QualityMath, CorrectionTransformPreservesMapBaseChain)
+{
+  cv::Matx44d map_to_base = cv::Matx44d::eye();
+  map_to_base(0, 3) = 4.0;
+  map_to_base(1, 3) = -2.0;
+  cv::Matx44d odom_to_base = cv::Matx44d::eye();
+  odom_to_base(0, 3) = 1.5;
+  odom_to_base(1, 3) = 0.5;
+  const cv::Matx44d map_to_odom = correctionTransform(map_to_base, odom_to_base);
+  EXPECT_NEAR(map_to_odom(0, 3), 2.5, 1e-12);
+  EXPECT_NEAR(map_to_odom(1, 3), -2.5, 1e-12);
+}
+
+TEST(QualityMath, CorrectionTransformPreservesRotatedMapBaseChain)
+{
+  cv::Matx44d map_to_base = cv::Matx44d::eye();
+  map_to_base(0, 0) = 0.0;
+  map_to_base(0, 1) = -1.0;
+  map_to_base(1, 0) = 1.0;
+  map_to_base(1, 1) = 0.0;
+  map_to_base(0, 3) = 3.0;
+  map_to_base(1, 3) = 4.0;
+
+  cv::Matx44d odom_to_base = map_to_base;
+  odom_to_base(0, 3) = 1.0;
+  odom_to_base(1, 3) = 2.0;
+
+  const cv::Matx44d map_to_odom = correctionTransform(map_to_base, odom_to_base);
+  const cv::Matx44d reconstructed_map_to_base = map_to_odom * odom_to_base;
+  for (int row = 0; row < 4; ++row)
+    for (int col = 0; col < 4; ++col)
+      EXPECT_NEAR(reconstructed_map_to_base(row, col), map_to_base(row, col), 1e-12);
 }

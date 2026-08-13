@@ -10,3 +10,7 @@ float64 quality_sum
 uint32 contributing_camera_count
 float64 processing_time_sec
 float64 localization_age_sec
+bool tf_published
+string tf_status
+string tf_parent_frame
+string tf_child_frame

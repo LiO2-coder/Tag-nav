@@ -133,6 +133,22 @@ inline double weightedYaw(const std::vector<double>& yaws,
   return std::atan2(sine, cosine);
 }
 
+inline cv::Matx44d correctionTransform(const cv::Matx44d& map_to_base,
+                                       const cv::Matx44d& odom_to_base)
+{
+  cv::Matx44d inverse = cv::Matx44d::eye();
+  for (int row = 0; row < 3; ++row)
+    for (int col = 0; col < 3; ++col)
+      inverse(row, col) = odom_to_base(col, row);
+  for (int row = 0; row < 3; ++row)
+  {
+    inverse(row, 3) = 0.0;
+    for (int col = 0; col < 3; ++col)
+      inverse(row, 3) -= inverse(row, col) * odom_to_base(col, 3);
+  }
+  return map_to_base * inverse;
+}
+
 inline bool validQualityMask(const std::string& mask)
 {
   return mask.size() == 4 && mask.find_first_not_of("01") == std::string::npos && mask != "0000";

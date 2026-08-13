@@ -1,0 +1,45 @@
+# Local odometry filter: /agv/odom and /agv/imu/data are measurements,
+# while this node is the sole owner of odom -> base_footprint.
+frequency: 50.0
+sensor_timeout: 0.10
+two_d_mode: true
+transform_time_offset: 0.0
+transform_timeout: 0.05
+print_diagnostics: true
+debug: false
+publish_tf: true
+publish_acceleration: false
+
+map_frame: map
+odom_frame: odom
+base_link_frame: base_footprint
+world_frame: odom
+
+odom0: /agv/odom
+# Fuse the wheel-encoder planar pose, velocity, and yaw rate. It remains a
+# local measurement in the odom frame; AprilTag correction publishes map->odom.
+odom0_config: [true,  true,  false,
+               false, false, false,
+               true,  true,  false,
+               false, false, true,
+               false, false, false]
+odom0_queue_size: 10
+odom0_nodelay: true
+odom0_differential: false
+odom0_relative: false
+
+imu0: /agv/imu/data
+# Fuse only IMU angular velocity and forward acceleration in planar mode.
+# Do not fuse the IMU's absolute yaw: a world-referenced simulated IMU yaw
+# would make odom->base jump when Gazebo teleports the model. The global
+# heading correction belongs to AprilTag's map->odom transform.
+imu0_config: [false, false, false,
+              false, false, false,
+              false, false, false,
+              false, false, true,
+              true,  false, false]
+imu0_queue_size: 20
+imu0_nodelay: true
+imu0_differential: false
+imu0_relative: false
+imu0_remove_gravitational_acceleration: true

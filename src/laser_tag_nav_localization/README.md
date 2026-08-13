@@ -28,8 +28,30 @@ roslaunch laser_tag_nav_localization factory_apriltag_localization.launch gui:=f
 ```
 
 Outputs are `~camera_best_tags`, `~localization`, and the valid-only
-`~pose`. TF publication is disabled by default; set `publish_tf:=true` only
-when this node is the owner of the `map -> base_footprint` transform.
+`~pose`. `~pose` and `~localization.pose` always represent the tag-fused
+`map -> base_footprint` pose.
+
+The `output` section controls TF ownership independently from `fusion.mode`:
+
+* `tf_mode: localization` publishes `map_frame -> base_frame` directly from
+  the fused pose.
+* `tf_mode: correction` queries the existing `odom_frame -> base_frame` at
+  the image timestamp and publishes `map_frame -> odom_frame`, computed as
+  `T_map_odom = T_map_base * inverse(T_odom_base)`.
+
+For the factory AprilTag launch, the Gazebo diff-drive TF broadcaster is
+disabled while its raw `/agv/odom` topic remains enabled; the
+`robot_localization` EKF becomes the sole owner of
+`odom -> base_footprint`; it fuses encoder-based `/agv/odom` with
+`/agv/imu/data` and publishes `/agv/odometry/filtered`. The simulated
+diff-drive plugin must use `odometrySource=encoder`, not `world`: the latter
+publishes Gazebo ground truth and would make the odometry frame jump when a
+model is manually moved. The local EKF also uses IMU angular velocity rather
+than an absolute world-referenced yaw. If the odom lookup is unavailable, the
+tag pose remains valid but this node skips the TF broadcast for that batch.
+`~localization` reports `tf_published`, `tf_status`, `tf_parent_frame`, and
+`tf_child_frame`.
+Set `output.publish_tf` to `false` to disable either TF mode.
 
 The quality mask is a four-character `ADMS` string from left to right:
 projected area, quadrilateral distortion, decision margin, and corner
