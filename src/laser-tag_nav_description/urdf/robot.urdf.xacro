@@ -3,6 +3,7 @@
 
   <xacro:arg name="robot_name" default="warehouse_agv"/>
   <xacro:arg name="namespace" default="/agv"/>
+  <xacro:arg name="publish_odom_tf" default="true"/>
   <xacro:arg name="chassis_length" default="0.90"/>
   <xacro:arg name="chassis_width" default="0.64"/>
   <xacro:arg name="chassis_height" default="0.24"/>
@@ -202,6 +203,9 @@
     near_clip="${bottom_camera_near_clip}"
     far_clip="${bottom_camera_far_clip}"/>
 
-  <xacro:warehouse_agv_gazebo robot_name="${robot_name}" namespace="${namespace}"/>
+  <xacro:warehouse_agv_gazebo
+    robot_name="${robot_name}"
+    namespace="${namespace}"
+    publish_odom_tf="$(arg publish_odom_tf)"/>
 
 </robot>

@@ -2,6 +2,7 @@
 <launch>
   <arg name="robot_name" default="warehouse_agv"/>
   <arg name="namespace" default="/agv"/>
+  <arg name="publish_odom_tf" default="true"/>
   <arg name="world_name" default="worlds/empty.world"/>
   <arg name="paused" default="false"/>
   <arg name="gui" default="true"/>
@@ -20,7 +21,7 @@
 
   <param
     name="robot_description"
-    command="$(find xacro)/xacro $(find laser-tag_nav_description)/urdf/robot.urdf.xacro robot_name:=$(arg robot_name) namespace:=$(arg namespace)"/>
+    command="$(find xacro)/xacro $(find laser-tag_nav_description)/urdf/robot.urdf.xacro robot_name:=$(arg robot_name) namespace:=$(arg namespace) publish_odom_tf:=$(arg publish_odom_tf)"/>
 
   <node
     name="robot_state_publisher"
