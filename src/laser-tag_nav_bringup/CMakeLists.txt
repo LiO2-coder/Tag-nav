@@ -6,12 +6,14 @@ find_package(catkin REQUIRED)
 catkin_package()
 
 install(
-  DIRECTORY launch worlds
+  DIRECTORY launch worlds maps
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
   PATTERN ".factory.world.swp" EXCLUDE
 )
 
 install(
-  PROGRAMS scripts/generate_apriltag_floor.py
+  PROGRAMS
+    scripts/generate_apriltag_floor.py
+    scripts/generate_factory_map.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

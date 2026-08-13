@@ -2,6 +2,7 @@
 <launch>
   <arg name="robot_name" default="warehouse_agv"/>
   <arg name="namespace" default="/agv"/>
+  <arg name="publish_odom_tf" default="true"/>
   <arg name="paused" default="false"/>
   <arg name="gui" default="true"/>
   <arg name="verbose" default="false"/>
@@ -17,6 +18,7 @@
   <include file="$(find laser-tag_nav_description)/launch/gazebo.launch">
     <arg name="robot_name" value="$(arg robot_name)"/>
     <arg name="namespace" value="$(arg namespace)"/>
+    <arg name="publish_odom_tf" value="$(arg publish_odom_tf)"/>
     <arg name="world_name" value="$(find laser-tag_nav_bringup)/worlds/factory.world"/>
     <arg name="paused" value="$(arg paused)"/>
     <arg name="gui" value="$(arg gui)"/>
