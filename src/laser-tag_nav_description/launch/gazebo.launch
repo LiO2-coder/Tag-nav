@@ -29,6 +29,10 @@
     type="robot_state_publisher"
     output="screen">
     <param name="publish_frequency" value="50.0"/>
+    <!-- gazebo_ros_diff_drive publishes the wheel joint states under the
+         robot namespace.  Feed them to this root-level publisher so the
+         dynamic base_link -> wheel-link transforms join the map TF tree. -->
+    <remap from="joint_states" to="$(arg namespace)/joint_states"/>
   </node>
 
   <node
