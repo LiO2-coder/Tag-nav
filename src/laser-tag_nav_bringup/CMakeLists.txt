@@ -6,7 +6,7 @@ find_package(catkin REQUIRED)
 catkin_package()
 
 install(
-  DIRECTORY launch worlds maps
+  DIRECTORY config launch maps rviz worlds
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
   PATTERN ".factory.world.swp" EXCLUDE
 )

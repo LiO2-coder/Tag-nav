@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- gui controls Gazebo's GUI and, by default, the navigation RViz view. -->
+  <arg name="paused" default="false"/>
+  <arg name="gui" default="true"/>
+  <arg name="rviz" default="$(arg gui)"/>
+  <arg name="x" default="0.0"/>
+  <arg name="y" default="0.0"/>
+  <arg name="yaw" default="0.0"/>
+
+  <!-- AprilTag correction owns map -> odom; EKF owns odom -> base_footprint. -->
+  <include file="$(find laser_tag_nav_localization)/launch/factory_apriltag_localization.launch">
+    <arg name="paused" value="$(arg paused)"/>
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="x" value="$(arg x)"/>
+    <arg name="y" value="$(arg y)"/>
+    <arg name="yaw" value="$(arg yaw)"/>
+  </include>
+
+  <node pkg="map_server" type="map_server" name="map_server" output="screen"
+        args="$(find laser-tag_nav_bringup)/maps/factory_map.yaml"/>
+
+  <node pkg="move_base" type="move_base" name="move_base" output="screen">
+    <rosparam command="load" file="$(find laser-tag_nav_bringup)/config/factory_navigation.yaml"/>
+    <remap from="cmd_vel" to="/agv/cmd_vel"/>
+  </node>
+
+  <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz_navigation" output="screen"
+        args="-d $(find laser-tag_nav_bringup)/rviz/factory_navigation.rviz"/>
+</launch>

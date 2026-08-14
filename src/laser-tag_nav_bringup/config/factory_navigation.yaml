@@ -1,0 +1,206 @@
+# Minimal navigation configuration for the factory AprilTag-localization demo.
+# The only obstacle source is the map_server occupancy map; no live sensor
+# obstacle layer is enabled so localization behavior stays the focus.
+
+# move_base private parameters
+shutdown_costmaps: false
+controller_frequency: 15.0
+controller_patience: 5.0
+# The map is static and AprilTag corrections are small, so the global plan
+# never goes stale.  Replan only on a new goal or a failed plan: a periodic
+# replan calls setPlan() every cycle, which clears the DWA xy-goal latch and
+# re-engages path tracking mid-alignment near the goal (the drive-stop-rotate
+# "spins near goal" failure).
+planner_frequency: 0.0
+planner_patience: 5.0
+oscillation_timeout: 10.0
+oscillation_distance: 0.20
+recovery_behavior_enabled: true
+clearing_rotation_allowed: true
+
+base_global_planner: global_planner/GlobalPlanner
+base_local_planner: dwa_local_planner/DWAPlannerROS
+
+GlobalPlanner:
+  # global_planner selects its A* expander when Dijkstra is disabled.
+  use_dijkstra: false
+  allow_unknown: false
+  use_quadratic: true
+  # Gradient traceback can fail on the factory's discrete static costmap even
+  # after A* has found a legal potential.  Grid traceback is deterministic and
+  # does not change the A* search itself.
+  use_grid_path: true
+  default_tolerance: 0.20
+
+DWAPlannerROS:
+  # Smooth medium-speed path-tracking profile.  The previous setup selected
+  # min_vel_trans for nearly every trajectory: at 0.10 m/s its 1.2 s horizon
+  # only evaluated roughly 12 cm ahead, which made DWA chase each A* grid turn.
+  # Raise the validated smooth-tracking profile to the requested cruise
+  # speed.  The longer prediction horizon below remains in place so DWA does
+  # not revert to chasing individual A* grid corners at this higher speed.
+  max_vel_x: 0.60
+  # The DWA plugin otherwise falls back to /odom.  This system publishes raw
+  # wheel odometry on /agv/odom and the filtered control velocity on
+  # /agv/odometry/filtered; use the latter so the dynamic window can build on
+  # the current speed instead of restarting at zero every controller cycle.
+  odom_topic: /agv/odometry/filtered
+  # Allow reverse so a goal behind the robot is reachable.  With min_vel_x=0
+  # the non-holonomic DWA cannot back up and only rotates in place very slowly
+  # toward a behind goal, which reads as "stuck, no error" (DWA still returns a
+  # valid near-zero command, so move_base never fails/recoveries).  Negative x
+  # lets DWA back directly along the plan; |vx| is still capped by max_vel_trans.
+  min_vel_x: -0.60
+  # Explicitly constrain the unused lateral component.  DWA's dynamic
+  # reconfigure server otherwise retains its non-holonomic defaults here.
+  max_vel_y: 0.0
+  min_vel_y: 0.0
+  max_vel_trans: 0.60
+  # Allow a clean (0,0) stop.  A positive min_vel_trans makes the sample gate
+  # reject (0,0) and forces creep at the is-stopped boundary, which reads as
+  # stop-start.  acc_lim_x still bounds deceleration, so this only removes the
+  # dead zone, not the braking limit.
+  min_vel_trans: 0.0
+  # Limit turning to a smooth indoor-navigation rate, but permit small
+  # steering corrections instead of forcing each correction to 0.10 rad/s.
+  max_vel_theta: 0.80
+  # DWAPlannerROS uses the absolute minimum rotational speed, so this must
+  # be positive (unlike the legacy TrajectoryPlannerROS parameter).
+  min_vel_theta: 0.05
+  # At the 15 Hz controller rate these admit the configured minimum linear
+  # and angular commands in the first DWA sampling window.  A moderate linear
+  # increase lets the robot reach its 0.60 m/s cruise speed on long straight
+  # aisles without increasing yaw acceleration (the latter causes wobble).
+  acc_lim_x: 2.00
+  acc_lim_y: 0.0
+  # Slightly softer yaw acceleration prevents abrupt steering changes at the
+  # corners of the grid-based global path.
+  acc_lim_theta: 3.20
+  acc_lim_trans: 2.00
+
+  holonomic_robot: false
+  # Widen the final heading accept-band so the latched in-place alignment
+  # terminates instead of hunting the last degrees.  0.20 rad (11.5 deg) keeps
+  # the worst-case chassis corner well inside the 0.39 m inscribed radius.
+  yaw_goal_tolerance: 0.20
+  xy_goal_tolerance: 0.20
+  # Once the robot reaches the position tolerance, keep that position goal
+  # latched while it aligns its final heading.  This prevents small heading
+  # corrections from sending the controller back into path tracking near the
+  # goal, where oscillation and recovery behaviors are most likely.
+  latch_xy_goal_tolerance: true
+  # A 2 s rollout at 0.60 m/s can leave no dynamically reachable braking
+  # sample when a narrow static obstacle appears just beyond a grid corner.
+  # This still looks far enough ahead for smooth tracking while letting DWA
+  # decelerate and steer before its rectangular footprint is boxed in.
+  sim_time: 1.7
+  sim_granularity: 0.05
+  angular_sim_granularity: 0.10
+  vx_samples: 20
+  vy_samples: 1
+  # The Noetic DWA plugin parameter is vth_samples; vtheta_samples belongs
+  # to the older base_local_planner implementation and is ignored here.
+  vth_samples: 30
+  use_dwa: true
+  # Drop global-plan points already behind the robot.  This prevents the
+  # path critic from repeatedly steering back toward stale A* grid points on
+  # long routes, while the global planner still supplies the route ahead.
+  prune_plan: true
+  # Keep stop detection above the filtered-odom noise floor.  0.05 made the
+  # "actually stopped" gate stricter than reality, so isGoalReached never
+  # passed and the oscillation check fell through to a 360-degree clearing
+  # spin.  0.10 sits above min_vel_theta, so a robot rotating at the minimum
+  # command is still detected as stopped.
+  trans_stopped_vel: 0.10
+  theta_stopped_vel: 0.10
+  # Keep DWA attached to the A* corridor, but not at the expense of obstacle
+  # clearance.  At 0.10 a corner entering the 253 inscribed zone cost only ~25
+  # against path pull of ~1.6/cell, so DWA clipped corners.  0.30 lets corner
+  # clearance win without turning open aisles into slow crawls.
+  path_distance_bias: 12.0
+  goal_distance_bias: 15.0
+  occdist_scale: 1.00
+  # Score a point farther ahead on the 2 s rollout and penalize unnecessary
+  # angular motion.  Together these favor a continuous cruise arc over
+  # alternating short left/right corrections at A* grid corners.
+  forward_point_distance: 0.65
+  twirling_scale: 0.40
+  stop_time_buffer: 0.20
+  # Grow the footprint with speed so corners carry real clearance at cruise.
+  # scaling_speed must sit below max_vel_trans or the scale ramp never fires;
+  # 0.25 -> 0.60 m/s ramps the footprint from 1.0x to 1.2x (circumscribed
+  # 0.65 m -> 0.78 m).  Near-goal speeds fall below 0.25 m/s, so goal settling
+  # is unaffected.
+  scaling_speed: 0.25
+  max_scaling_factor: 0.2
+  oscillation_reset_dist: 0.20
+  # Keep these enabled for field verification.  They expose the sampled
+  # trajectories and their costs in RViz/bags without changing control.
+  publish_traj_pc: true
+  publish_cost_grid_pc: true
+
+  # heading_scoring: true
+  # heading_lookahead_time: 0.325
+
+# Shared robot geometry. The physical envelope is approximately 1.02 m over
+# the bumpers and 0.754 m over the wheels; this 1.04 m x 0.78 m footprint
+# adds a 1--2.6 cm clearance margin on each side.
+robot_footprint: &robot_footprint
+  [[-0.52, -0.39], [-0.52, 0.39], [0.52, 0.39], [0.52, -0.39]]
+
+global_costmap:
+  global_frame: map
+  robot_base_frame: base_footprint
+  update_frequency: 5.0
+  publish_frequency: 1.0
+  transform_tolerance: 0.50
+  rolling_window: false
+  # Preserve the map's unknown outer border as non-traversable space.
+  track_unknown_space: true
+  resolution: 0.05
+  footprint: *robot_footprint
+  plugins:
+    - {name: static_layer, type: "costmap_2d::StaticLayer"}
+    - {name: inflation_layer, type: "costmap_2d::InflationLayer"}
+  static_layer:
+    map_topic: /map
+    subscribe_to_updates: false
+  inflation_layer:
+    inflation_radius: 0.75
+    # A softer exponential tail keeps cost high farther from obstacles so DWA
+    # starts steering away before the flat 253 inscribed band.
+    cost_scaling_factor: 2.0
+
+local_costmap:
+  # StaticLayer supports a source-map frame different from this rolling
+  # costmap frame: it transforms map cells through map -> odom on each
+  # update.  Keeping the controller in odom preserves smooth local motion
+  # while the global plan and the static map remain aligned after an
+  # AprilTag map -> odom correction.
+  global_frame: odom
+  robot_base_frame: base_footprint
+  update_frequency: 10.0
+  publish_frequency: 2.0
+  transform_tolerance: 0.50
+  rolling_window: true
+  width: 6.0
+  height: 6.0
+  resolution: 0.05
+  # This local map is only a transformed view of the static global map.  A
+  # short map->odom correction gap can otherwise leave NO_INFORMATION cells
+  # in the rolling window; DWA and rotate recovery reject them as a collision
+  # (Cost: -2).  Keep unknown cells blocked in the global A* costmap above,
+  # but treat them as free locally so the static obstacle geometry remains
+  # usable during localization corrections.
+  track_unknown_space: false
+  footprint: *robot_footprint
+  plugins:
+    - {name: static_layer, type: "costmap_2d::StaticLayer"}
+    - {name: inflation_layer, type: "costmap_2d::InflationLayer"}
+  static_layer:
+    map_topic: /map
+    subscribe_to_updates: false
+    track_unknown_space: false
+  inflation_layer:
+    inflation_radius: 0.75
+    cost_scaling_factor: 2.0
