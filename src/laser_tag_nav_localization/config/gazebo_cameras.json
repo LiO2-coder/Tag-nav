@@ -61,13 +61,15 @@
     "tf_mode": "correction",
     "publish_tf": true,
     "tf_lookup_timeout_sec": 0.05,
-    "debug_images": true,
+    "correction_tf_tolerance_sec": 0.25,
+    "correction_tf_publish_rate_hz": 10.0,
+    "debug_images": false,
     "invalid_variance": 1000000.0
   },
   "cameras": [
     {
       "name": "front",
-      "enabled": true,
+      "enabled": false,
       "image_topic": "/agv/camera/front/image_raw",
       "transport": "raw",
       "data_format": "rgb8",
@@ -84,7 +86,7 @@
     },
     {
       "name": "rear",
-      "enabled": true,
+      "enabled": false,
       "image_topic": "/agv/camera/rear/image_raw",
       "transport": "raw",
       "data_format": "rgb8",
@@ -101,7 +103,7 @@
     },
     {
       "name": "left",
-      "enabled": true,
+      "enabled": false,
       "image_topic": "/agv/camera/left/image_raw",
       "transport": "raw",
       "data_format": "rgb8",
@@ -118,7 +120,7 @@
     },
     {
       "name": "right",
-      "enabled": true,
+      "enabled": false,
       "image_topic": "/agv/camera/right/image_raw",
       "transport": "raw",
       "data_format": "rgb8",

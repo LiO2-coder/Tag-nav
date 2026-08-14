@@ -4,6 +4,24 @@
 latest frames from the configured cameras, detects mapped AprilTags, and
 publishes a quality-weighted pose for `base_footprint`.
 
+## Architecture
+
+The node keeps the established ROS 1 interface, but its implementation is
+layered so localization math can be tested without a ROS master:
+
+* `laser_tag_nav_localization_core` contains configuration and tag-map parsing,
+  rigid-transform math, AprilTag/PnP recognition, quality scoring, and fusion.
+  Its headers have no ROS, TF, image-transport, cv_bridge, or generated-message
+  dependencies.
+* `laser_tag_nav_localization_ros` adapts private ROS parameters, TF lookup and
+  broadcast, and the existing output messages to that core library.
+* `apriltag_localization_node` owns subscriptions, image queues, scheduling,
+  cv_bridge conversion, debug publishing, and object assembly only.
+
+This split is intentionally internal: executable name, launch files, JSON v1
+and legacy configuration support, parameter precedence, private topics, message
+types, and TF modes remain unchanged.
+
 The node requires these private parameters:
 
 * `cameras_json`: JSON string loaded by launch `textfile`. The version-1 object
@@ -52,6 +70,13 @@ tag pose remains valid but this node skips the TF broadcast for that batch.
 `~localization` reports `tf_published`, `tf_status`, `tf_parent_frame`, and
 `tf_child_frame`.
 Set `output.publish_tf` to `false` to disable either TF mode.
+
+In correction mode, `output.correction_tf_tolerance_sec` (default `0.25`) and
+`output.correction_tf_publish_rate_hz` (default `30`) keep the most recent
+`map -> odom` correction valid slightly ahead of the current ROS time. This is
+needed by control nodes that transform a freshly generated `map`-frame plan to
+the `odom` frame while AprilTag image processing is in progress. The transform
+value is still computed from the image timestamp and matching odometry sample.
 
 The quality mask is a four-character `ADMS` string from left to right:
 projected area, quadrilateral distortion, decision margin, and corner

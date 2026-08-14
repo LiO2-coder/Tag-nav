@@ -1,6 +1,9 @@
 <launch>
   <arg name="paused" default="false"/>
   <arg name="gui" default="true"/>
+  <arg name="x" default="0.0"/>
+  <arg name="y" default="0.0"/>
+  <arg name="yaw" default="0.0"/>
   <arg name="publish_tf" default=""/>
   <arg name="debug_images" default=""/>
   <arg name="tf_mode" default=""/>
@@ -15,6 +18,9 @@
   <include file="$(find laser-tag_nav_bringup)/launch/factory_gazebo.launch">
     <arg name="paused" value="$(arg paused)"/>
     <arg name="gui" value="$(arg gui)"/>
+    <arg name="x" value="$(arg x)"/>
+    <arg name="y" value="$(arg y)"/>
+    <arg name="yaw" value="$(arg yaw)"/>
     <!-- The EKF below is the only publisher of odom -> base_footprint. -->
     <arg name="publish_odom_tf" value="false"/>
   </include>

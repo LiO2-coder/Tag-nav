@@ -20,6 +20,10 @@
   <build_depend>libopencv-dev</build_depend>
   <build_depend>libjsoncpp-dev</build_depend>
 
+  <build_export_depend>apriltag</build_export_depend>
+  <build_export_depend>libopencv-dev</build_export_depend>
+  <build_export_depend>libjsoncpp-dev</build_export_depend>
+
   <exec_depend>message_runtime</exec_depend>
   <exec_depend>roscpp</exec_depend>
   <exec_depend>roslib</exec_depend>
