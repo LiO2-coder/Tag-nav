@@ -362,6 +362,25 @@ rosrun laser-tag_nav_bringup generate_factory_map.py \
   --output-dir /path/to/maps
 ```
 
+## 工厂导航验证（A* + DWA）
+
+安装 ROS Noetic 导航栈后，可启动基于 AprilTag 定位的最小导航闭环：
+
+```bash
+sudo apt install ros-noetic-navigation
+roslaunch laser-tag_nav_bringup factory_navigation.launch
+```
+
+该启动文件会启动工厂 Gazebo、AprilTag 定位、`map_server`、`move_base` 和 RViz。
+定位继续使用 `map -> odom -> base_footprint` TF 链；全局规划器
+`global_planner/GlobalPlanner` 以 A* 生成路径，局部规划器使用
+`dwa_local_planner/DWAPlannerROS`，速度上限为 `0.6 m/s` 和 `0.8 rad/s`。
+在 RViz 中选择 **2D Nav Goal** 即可发送导航目标。传入 `gui:=false` 可同时关闭
+Gazebo GUI 与 RViz；若只想关闭 Gazebo GUI 而保留 RViz，可另传 `rviz:=true`。
+
+此配置只使用 `factory_map` 静态障碍层，未接入 `/velodyne_points` 或动态避障，目的是
+隔离并验证标签定位对导航闭环的影响。
+
 ## AprilTag 定位配置
 
 定位配置文件为 [gazebo_cameras.json](src/laser_tag_nav_localization/config/gazebo_cameras.json)，

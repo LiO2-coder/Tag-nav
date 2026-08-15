@@ -39,6 +39,7 @@ add_library(laser_tag_nav_localization_core
   src/core/transform_math.cpp
   src/core/apriltag_recognizer.cpp
   src/core/fusion_engine.cpp
+  src/core/pose_temporal_filter.cpp
 )
 target_link_libraries(laser_tag_nav_localization_core
   ${OpenCV_LIBRARIES} ${APRILTAG_LIBRARIES} jsoncpp
@@ -86,6 +87,12 @@ if(CATKIN_ENABLE_TESTING)
   catkin_add_gtest(test_core test/test_core.cpp)
   if(TARGET test_core)
     target_link_libraries(test_core laser_tag_nav_localization_core ${OpenCV_LIBRARIES}
+      ${APRILTAG_LIBRARIES} jsoncpp)
+  endif()
+
+  catkin_add_gtest(test_temporal_filter test/test_temporal_filter.cpp)
+  if(TARGET test_temporal_filter)
+    target_link_libraries(test_temporal_filter laser_tag_nav_localization_core ${OpenCV_LIBRARIES}
       ${APRILTAG_LIBRARIES} jsoncpp)
   endif()
 endif()

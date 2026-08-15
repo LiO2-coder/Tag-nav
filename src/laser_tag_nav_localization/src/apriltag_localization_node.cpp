@@ -20,6 +20,7 @@
 #include <laser_tag_nav_localization/FusedAprilTagLocalization.h>
 #include <laser_tag_nav_localization/core/apriltag_recognizer.h>
 #include <laser_tag_nav_localization/core/fusion_engine.h>
+#include <laser_tag_nav_localization/core/pose_temporal_filter.h>
 #include <laser_tag_nav_localization/ros/ros_config_loader.h>
 #include <laser_tag_nav_localization/ros/ros_message_adapter.h>
 #include <laser_tag_nav_localization/ros/ros_tf_bridge.h>
@@ -41,8 +42,8 @@ public:
   AprilTagLocalizationNode()
     : nh_(), private_nh_("~"), image_transport_(nh_),
       config_(ros_adapter::RosConfigLoader(private_nh_).load()),
-      recognizer_(config_), fusion_engine_(config_), tf_bridge_(config_.output),
-      camera_runtime_(config_.cameras.size())
+      recognizer_(config_), fusion_engine_(config_), pose_filter_(config_.temporal_filter),
+      tf_bridge_(config_.output), camera_runtime_(config_.cameras.size())
   {
     camera_results_publisher_ = private_nh_.advertise<CameraBestTagArray>("camera_best_tags", 1);
     localization_publisher_ = private_nh_.advertise<FusedAprilTagLocalization>("localization", 1);
@@ -239,6 +240,9 @@ private:
                       const std::vector<ros_adapter::CameraFrame>& frames)
   {
     const core::FusionResult fusion = fusion_engine_.fuse(observations);
+    core::FusionResult smoothed = fusion;
+    if (fusion.valid && config_.temporal_filter.enabled)
+      smoothed.pose.map_to_base = pose_filter_.filter(fusion.pose.map_to_base, stamp.toSec());
     camera_results_publisher_.publish(ros_adapter::makeCameraArray(stamp, config_, fusion, frames));
 
     ros_adapter::TfPublicationStatus tf_status;
@@ -248,7 +252,7 @@ private:
     {
       last_valid_stamp_ = stamp;
       age = 0.0;
-      tf_status = tf_bridge_.publishFused(fusion.pose.map_to_base, stamp);
+      tf_status = tf_bridge_.publishFused(smoothed.pose.map_to_base, stamp);
     }
     else
     {
@@ -275,7 +279,7 @@ private:
       }
     }
     FusedAprilTagLocalization localization = ros_adapter::makeLocalization(
-        stamp, config_, fusion, last_processing_time_sec_, age, tf_status);
+        stamp, config_, smoothed, last_processing_time_sec_, age, tf_status);
     localization_publisher_.publish(localization);
     if (fusion.valid)
       pose_publisher_.publish(localization.pose);
@@ -292,6 +296,7 @@ private:
   core::LocalizationConfig config_;
   core::AprilTagRecognizer recognizer_;
   core::FusionEngine fusion_engine_;
+  core::PoseTemporalFilter pose_filter_;
   ros_adapter::RosTfBridge tf_bridge_;
   std::vector<CameraRuntime> camera_runtime_;
   std::vector<image_transport::Subscriber> image_subscribers_;

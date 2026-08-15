@@ -169,6 +169,16 @@ void parseFusionConfiguration(const Json::Value& section, FusionConfig& fusion)
       gate, "max_orientation_residual_rad", fusion.outlier_orientation_threshold);
 }
 
+void parseTemporalFilterConfiguration(const Json::Value& section, TemporalFilterConfig& filter)
+{
+  filter.enabled = jsonBool(section, "enabled", filter.enabled);
+  filter.position_time_constant_sec = jsonDouble(
+      section, "position_time_constant_sec", filter.position_time_constant_sec);
+  filter.orientation_time_constant_sec = jsonDouble(
+      section, "orientation_time_constant_sec", filter.orientation_time_constant_sec);
+  filter.max_dt_sec = jsonDouble(section, "max_dt_sec", filter.max_dt_sec);
+}
+
 Json::Value parseJson(const std::string& text, const std::string& source)
 {
   Json::CharReaderBuilder builder;
@@ -224,6 +234,7 @@ LocalizationConfig parseConfiguration(const std::string& cameras_json,
       runtime, "localization_timeout_sec", config.runtime.localization_timeout_sec);
   parseQualityConfiguration(jsonSection(root, "quality"), config.quality);
   parseFusionConfiguration(jsonSection(root, "fusion"), config.fusion);
+  parseTemporalFilterConfiguration(jsonSection(root, "temporal_filter"), config.temporal_filter);
 
   const Json::Value& validation = jsonSection(root, "validation");
   config.validation.min_tag_area_px = jsonDouble(validation, "min_tag_area_px",
@@ -386,6 +397,11 @@ void validateConfiguration(LocalizationConfig& config)
   if (config.fusion.min_contributing_cameras < 1 || config.fusion.outlier_position_threshold < 0.0 ||
       config.fusion.outlier_yaw_threshold < 0.0 || config.fusion.outlier_orientation_threshold < 0.0)
     throw std::runtime_error("invalid fusion configuration");
+  if (config.temporal_filter.enabled &&
+      (config.temporal_filter.position_time_constant_sec <= 0.0 ||
+       config.temporal_filter.orientation_time_constant_sec <= 0.0 ||
+       config.temporal_filter.max_dt_sec <= 0.0))
+    throw std::runtime_error("temporal_filter time constants and max_dt_sec must be positive");
   for (const auto& camera : config.cameras)
   {
     if (camera.K(0, 0) <= 0.0 || camera.K(1, 1) <= 0.0)

@@ -102,6 +102,14 @@ core::LocalizationConfig RosConfigLoader::load() const
                              config.fusion.min_position_stddev);
   private_node_handle_.param("min_yaw_stddev", config.fusion.min_yaw_stddev,
                              config.fusion.min_yaw_stddev);
+  private_node_handle_.param("temporal_filter_enabled", config.temporal_filter.enabled,
+                             config.temporal_filter.enabled);
+  private_node_handle_.param("temporal_filter_position_time_constant",
+                             config.temporal_filter.position_time_constant_sec,
+                             config.temporal_filter.position_time_constant_sec);
+  private_node_handle_.param("temporal_filter_orientation_time_constant",
+                             config.temporal_filter.orientation_time_constant_sec,
+                             config.temporal_filter.orientation_time_constant_sec);
   private_node_handle_.param("invalid_variance", config.output.invalid_variance,
                              config.output.invalid_variance);
 

@@ -97,6 +97,14 @@ struct FusionConfig
   double min_yaw_stddev = 0.035;
 };
 
+struct TemporalFilterConfig
+{
+  bool enabled = false;
+  double position_time_constant_sec = 0.25;
+  double orientation_time_constant_sec = 0.25;
+  double max_dt_sec = 1.0;
+};
+
 struct ValidationConfig
 {
   double min_tag_area_px = 0.0;
@@ -130,6 +138,7 @@ struct LocalizationConfig
   RuntimeConfig runtime;
   QualityConfig quality;
   FusionConfig fusion;
+  TemporalFilterConfig temporal_filter;
   ValidationConfig validation;
   OutputConfig output;
 
