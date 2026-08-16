@@ -7,6 +7,10 @@
 
 #include <gtest/gtest.h>
 
+#include <opencv2/imgproc.hpp>
+
+#include <apriltag/tag36h11.h>
+
 #include <laser_tag_nav_localization/core/configuration.h>
 #include <laser_tag_nav_localization/core/apriltag_recognizer.h>
 #include <laser_tag_nav_localization/core/fusion_engine.h>
@@ -52,6 +56,45 @@ core::CameraObservation observation(std::size_t camera_index, double x, double y
 std::string temporaryMapPath()
 {
   return "/tmp/laser_tag_nav_localization_test_map.json";
+}
+
+// Renders a tag36h11 tag from the family's bit layout: a one-cell black border
+// around a grid whose cells are white when the code bit is set and black
+// otherwise. The image is padded with a white margin so the detector can find
+// the black border.
+cv::Mat renderTag36h11(int tag_id, int cell_px = 12)
+{
+  apriltag_family_t* family = tag36h11_create();
+  const int grid = static_cast<int>(family->width_at_border);
+  const int margin = 2 * cell_px;
+  const int size = grid * cell_px + 2 * margin;
+  cv::Mat image(size, size, CV_8UC1, cv::Scalar(255));
+  for (int y = 0; y < grid; ++y)
+  {
+    for (int x = 0; x < grid; ++x)
+    {
+      bool black = false;
+      if (x == 0 || y == 0 || x == grid - 1 || y == grid - 1)
+      {
+        black = true;
+      }
+      else
+      {
+        uint32_t bit_index = 0;
+        for (; bit_index < family->nbits; ++bit_index)
+          if (family->bit_x[bit_index] == static_cast<uint32_t>(x) &&
+              family->bit_y[bit_index] == static_cast<uint32_t>(y))
+            break;
+        const bool bit = (family->codes[tag_id] >> (family->nbits - 1 - bit_index)) & 1ULL;
+        black = !bit;
+      }
+      if (black)
+        cv::rectangle(image, cv::Rect(margin + x * cell_px, margin + y * cell_px, cell_px, cell_px),
+                      cv::Scalar(0), -1);
+    }
+  }
+  tag36h11_destroy(family);
+  return image;
 }
 
 }  // namespace
@@ -151,6 +194,51 @@ TEST(AprilTagRecognizer, BlankImageHasNoMappedTag)
   const core::CameraObservation result = recognizer.recognize(cv::Mat::zeros(48, 64, CV_8UC1), 0);
   EXPECT_FALSE(result.has_candidate);
   EXPECT_EQ(result.status, "no_mapped_tag");
+}
+
+TEST(AprilTagRecognizer, MappedTagProducesCandidate)
+{
+  core::LocalizationConfig config = fusionConfig();
+  config.detector.tag_family = "tag36h11";
+  config.cameras.resize(1);
+  config.cameras[0].name = "front";
+  const int cell = 12;
+  const int size = 8 * cell + 4 * cell;  // matches renderTag36h11(0, cell)
+  config.cameras[0].K = cv::Matx33d(size / 2.0, 0.0, size / 2.0,
+                                    0.0, size / 2.0, size / 2.0, 0.0, 0.0, 1.0);
+  config.tag_map[0] = core::TagMapEntry();
+  core::AprilTagRecognizer recognizer(config);
+  const core::CameraObservation result = recognizer.recognize(renderTag36h11(0, cell), 0);
+  EXPECT_TRUE(result.has_candidate);
+  EXPECT_EQ(result.status, "valid");
+  EXPECT_EQ(result.candidate.tag_id, 0);
+}
+
+TEST(AprilTagRecognizer, UnmappedTagReportedOnlyWhenEnabled)
+{
+  core::LocalizationConfig config = fusionConfig();
+  config.detector.tag_family = "tag36h11";
+  config.cameras.resize(1);
+  config.cameras[0].name = "front";
+  const int cell = 12;
+  const int size = 8 * cell + 4 * cell;
+  config.cameras[0].K = cv::Matx33d(size / 2.0, 0.0, size / 2.0,
+                                    0.0, size / 2.0, size / 2.0, 0.0, 0.0, 1.0);
+  const cv::Mat tag = renderTag36h11(0, cell);
+
+  config.validation.reject_unmapped_tags = true;
+  core::AprilTagRecognizer rejecting(config);
+  core::CameraObservation result = rejecting.recognize(tag, 0);
+  EXPECT_FALSE(result.has_candidate);
+  EXPECT_EQ(result.status, "no_mapped_tag");
+  EXPECT_EQ(result.candidate.tag_id, -1);
+
+  config.validation.reject_unmapped_tags = false;
+  core::AprilTagRecognizer reporting(config);
+  result = reporting.recognize(tag, 0);
+  EXPECT_FALSE(result.has_candidate);
+  EXPECT_EQ(result.status, "unmapped_tag");
+  EXPECT_EQ(result.candidate.tag_id, 0);
 }
 
 TEST(Configuration, ParsesMapAndPackageUriThroughInjectedResolver)

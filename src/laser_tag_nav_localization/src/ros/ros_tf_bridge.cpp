@@ -69,9 +69,13 @@ TfPublicationStatus RosTfBridge::publishFused(const core::Transform& map_to_base
     result.status = "odom_base_unavailable";
     return result;
   }
-  last_map_to_odom_ = map_to_base * core::inverseRigid(transformFromTf(odom_to_base));
-  have_map_to_odom_ = true;
-  return publishCorrection(last_map_to_odom_, "published");
+  const core::Transform map_to_odom = map_to_base * core::inverseRigid(transformFromTf(odom_to_base));
+  {
+    std::lock_guard<std::mutex> lock(tf_mutex_);
+    last_map_to_odom_ = map_to_odom;
+    have_map_to_odom_ = true;
+  }
+  return publishCorrection(map_to_odom, "published");
 }
 
 TfPublicationStatus RosTfBridge::publishHeldCorrection()
@@ -79,9 +83,16 @@ TfPublicationStatus RosTfBridge::publishHeldCorrection()
   TfPublicationStatus result;
   result.parent_frame = config_.map_frame;
   result.child_frame = config_.odom_frame;
-  if (!config_.publish_tf || config_.tf_mode != "correction" || !have_map_to_odom_)
+  core::Transform held;
+  bool have = false;
+  {
+    std::lock_guard<std::mutex> lock(tf_mutex_);
+    have = have_map_to_odom_;
+    held = last_map_to_odom_;
+  }
+  if (!config_.publish_tf || config_.tf_mode != "correction" || !have)
     return result;
-  return publishCorrection(last_map_to_odom_, "correction_held");
+  return publishCorrection(held, "correction_held");
 }
 
 void RosTfBridge::republishHeldCorrection()
@@ -103,6 +114,7 @@ TfPublicationStatus RosTfBridge::publish(const core::Transform& transform, const
   TfPublicationStatus result;
   result.parent_frame = parent;
   result.child_frame = child;
+  std::lock_guard<std::mutex> lock(tf_mutex_);
   if (stamp < last_tf_stamp_)
   {
     ROS_WARN_THROTTLE(2.0, "TF timestamp moved backwards; resetting TF timestamp guard");

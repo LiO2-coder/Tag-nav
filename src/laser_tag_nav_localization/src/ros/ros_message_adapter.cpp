@@ -43,14 +43,19 @@ void setCameraMessage(const core::LocalizationConfig& config,
   message.status = observation && observation->rejected ? "outlier" :
       (observation && observation->has_candidate ? "valid" :
        (observation && !observation->status.empty() ? observation->status : "not_in_sync_window"));
-  message.tag_id = observation && observation->has_candidate ? observation->candidate.tag_id : -1;
+  const bool has_report = observation && observation->candidate.tag_id >= 0;
+  message.tag_id = has_report ? observation->candidate.tag_id : -1;
   message.weight = weight;
   message.quality_mask = config.quality.mask;
-  if (!observation || !observation->has_candidate)
+  if (!has_report)
     return;
   const core::TagCandidate& candidate = observation->candidate;
-  message.camera_tag_pose.header = message.header;
-  poseFromTransform(candidate.camera_to_tag, message.camera_tag_pose.pose.pose);
+  if (observation->has_candidate)
+  {
+    message.camera_tag_pose.header = message.header;
+    poseFromTransform(candidate.camera_to_tag, message.camera_tag_pose.pose.pose);
+    message.range_m = candidate.range_m;
+  }
   message.area_px = candidate.scores.area_px;
   message.area_score = candidate.scores.area;
   message.distortion_error = candidate.scores.distortion_error;
@@ -61,7 +66,6 @@ void setCameraMessage(const core::LocalizationConfig& config,
   message.sharpness_score = candidate.scores.sharpness;
   message.quality = candidate.scores.quality;
   message.weighted_quality = candidate.weighted_quality;
-  message.range_m = candidate.range_m;
   for (std::size_t index = 0; index < candidate.corners.size(); ++index)
   {
     message.corners[2 * index] = candidate.corners[index].x;

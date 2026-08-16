@@ -52,7 +52,11 @@ FamilyHandle createFamily(const std::string& family_name)
   else APRILTAG_FAMILY(tagStandard52h13)
 #undef APRILTAG_FAMILY
   if (!handle.family)
-    throw std::runtime_error("unsupported or unavailable AprilTag family: " + family_name);
+    throw std::runtime_error(
+        "unsupported or unavailable AprilTag family: '" + family_name + "'. Supported "
+        "families (apriltag 0.10.0): tag16h5, tag25h9, tag36h10, tag36h11, tagCircle21h7, "
+        "tagCircle49h12, tagCustom48h12, tagStandard41h12, tagStandard52h13. Custom "
+        "families require recompiling this node.");
   return handle;
 }
 
@@ -152,6 +156,39 @@ struct AprilTagRecognizer::Impl
     return samples > 0 ? total / samples : 0.0;
   }
 
+  bool mapped(int tag_id) const
+  {
+    return config.tag_map.find(tag_id) != config.tag_map.end();
+  }
+
+  // Fills corners, tag id, hamming and every quality score. Does not require a
+  // map entry or a tag size, so it can report tags that are detected but not
+  // mapped. Pose fields (camera_to_tag, range_m, map_to_base) stay untouched.
+  void computeScores(const cv::Mat& gray, cv::Mat& gradient,
+                     apriltag_detection_t* detection, std::size_t camera_index,
+                     TagCandidate& candidate) const
+  {
+    const CameraModel& camera = config.cameras[camera_index];
+    for (std::size_t index = 0; index < 4; ++index)
+      candidate.corners[index] = cv::Point2d(detection->p[index][0], detection->p[index][1]);
+    candidate.tag_id = detection->id;
+    candidate.hamming = detection->hamming;
+    candidate.scores.area_px = polygonArea(candidate.corners);
+    candidate.scores.area = clamp01(candidate.scores.area_px / config.quality.area_reference_px);
+    candidate.scores.distortion_error = quadrilateralDistortionError(candidate.corners);
+    candidate.scores.distortion = std::exp(-candidate.scores.distortion_error /
+                                           std::max(1e-6, config.quality.distortion_scale));
+    candidate.scores.decision_margin = detection->decision_margin;
+    candidate.scores.margin = clamp01(detection->decision_margin / config.quality.margin_reference);
+    candidate.scores.corner_gradient = cornerSharpness(gray, candidate.corners, gradient);
+    candidate.scores.sharpness = clamp01(candidate.scores.corner_gradient /
+                                          config.quality.sharpness_reference);
+    candidate.scores.quality = geometricQuality(
+        {{candidate.scores.area, candidate.scores.distortion, candidate.scores.margin,
+          candidate.scores.sharpness}}, config.quality.metric_exponents);
+    candidate.weighted_quality = candidate.scores.quality * camera.confidence_multiplier;
+  }
+
   bool makeCandidate(const cv::Mat& gray, cv::Mat& gradient,
                      apriltag_detection_t* detection, std::size_t camera_index,
                      TagCandidate& candidate) const
@@ -160,10 +197,7 @@ struct AprilTagRecognizer::Impl
     const auto map_it = config.tag_map.find(detection->id);
     if (map_it == config.tag_map.end() || detection->hamming > config.detector.max_hamming_dist)
       return false;
-    for (std::size_t index = 0; index < 4; ++index)
-      candidate.corners[index] = cv::Point2d(detection->p[index][0], detection->p[index][1]);
-    candidate.tag_id = detection->id;
-    candidate.hamming = detection->hamming;
+    computeScores(gray, gradient, detection, camera_index, candidate);
 
     const double half_size = map_it->second.size / 2.0;
     std::vector<cv::Point3d> object_points{
@@ -204,23 +238,9 @@ struct AprilTagRecognizer::Impl
     pnp_tag_to_map_tag(1, 1) = -1.0;
     pnp_tag_to_map_tag(2, 2) = -1.0;
     candidate.camera_to_tag = candidate.camera_to_tag * pnp_tag_to_map_tag;
-    candidate.scores.area_px = polygonArea(candidate.corners);
     if (config.validation.min_tag_area_px > 0.0 &&
         candidate.scores.area_px < config.validation.min_tag_area_px)
       return false;
-    candidate.scores.area = clamp01(candidate.scores.area_px / config.quality.area_reference_px);
-    candidate.scores.distortion_error = quadrilateralDistortionError(candidate.corners);
-    candidate.scores.distortion = std::exp(-candidate.scores.distortion_error /
-                                           std::max(1e-6, config.quality.distortion_scale));
-    candidate.scores.decision_margin = detection->decision_margin;
-    candidate.scores.margin = clamp01(detection->decision_margin / config.quality.margin_reference);
-    candidate.scores.corner_gradient = cornerSharpness(gray, candidate.corners, gradient);
-    candidate.scores.sharpness = clamp01(candidate.scores.corner_gradient /
-                                          config.quality.sharpness_reference);
-    candidate.scores.quality = geometricQuality(
-        {{candidate.scores.area, candidate.scores.distortion, candidate.scores.margin,
-          candidate.scores.sharpness}}, config.quality.metric_exponents);
-    candidate.weighted_quality = candidate.scores.quality * camera.confidence_multiplier;
     if (candidate.weighted_quality < config.quality.min_quality)
       return false;
     candidate.map_to_base = map_it->second.map_to_tag * inverseRigid(candidate.camera_to_tag) *
@@ -269,24 +289,52 @@ CameraObservation AprilTagRecognizer::recognize(const cv::Mat& gray, std::size_t
   zarray_t* detections = apriltag_detector_detect(impl_->detector, &image);
   cv::Mat gradient;
   bool have_candidate = false;
+  bool have_unmapped = false;
   TagCandidate best;
+  TagCandidate best_unmapped;
   for (int index = 0; index < zarray_size(detections); ++index)
   {
     apriltag_detection_t* detection = nullptr;
     zarray_get(detections, index, &detection);
-    TagCandidate candidate;
-    if (impl_->makeCandidate(gray, gradient, detection, camera_index, candidate) &&
-        (!have_candidate || candidate.scores.quality > best.scores.quality))
+    if (impl_->mapped(detection->id))
     {
-      best = candidate;
-      have_candidate = true;
+      TagCandidate candidate;
+      if (impl_->makeCandidate(gray, gradient, detection, camera_index, candidate) &&
+          (!have_candidate || candidate.scores.quality > best.scores.quality))
+      {
+        best = candidate;
+        have_candidate = true;
+      }
+    }
+    else if (!impl_->config.validation.reject_unmapped_tags &&
+             detection->hamming <= impl_->config.detector.max_hamming_dist)
+    {
+      TagCandidate candidate;
+      impl_->computeScores(gray, gradient, detection, camera_index, candidate);
+      if (!have_unmapped || candidate.scores.quality > best_unmapped.scores.quality)
+      {
+        best_unmapped = candidate;
+        have_unmapped = true;
+      }
     }
   }
   apriltag_detections_destroy(detections);
-  result.has_candidate = have_candidate;
-  result.status = have_candidate ? "valid" : "no_mapped_tag";
   if (have_candidate)
+  {
+    result.has_candidate = true;
+    result.status = "valid";
     result.candidate = best;
+  }
+  else if (have_unmapped)
+  {
+    result.has_candidate = false;
+    result.status = "unmapped_tag";
+    result.candidate = best_unmapped;
+  }
+  else
+  {
+    result.status = "no_mapped_tag";
+  }
   return result;
 }
 

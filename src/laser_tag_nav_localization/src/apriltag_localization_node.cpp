@@ -3,6 +3,7 @@
 #include <deque>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -34,7 +35,53 @@ struct CameraRuntime
 {
   std::deque<sensor_msgs::ImageConstPtr> queue;
   image_transport::Publisher debug_publisher;
+  std::string target_encoding;
 };
+
+// Resolves the per-camera data_format into a cv_bridge target encoding. An
+// empty data_format keeps the previous MONO8 default. Unknown encodings are
+// rejected here so a typo fails at startup rather than per frame.
+std::string resolveTargetEncoding(const core::CameraModel& camera)
+{
+  if (camera.data_format.empty())
+    return sensor_msgs::image_encodings::MONO8;
+  const std::string& format = camera.data_format;
+  if (format == sensor_msgs::image_encodings::MONO8 ||
+      format == sensor_msgs::image_encodings::MONO16 ||
+      format == sensor_msgs::image_encodings::RGB8 ||
+      format == sensor_msgs::image_encodings::BGR8 ||
+      format == sensor_msgs::image_encodings::RGBA8 ||
+      format == sensor_msgs::image_encodings::BGRA8)
+    return format;
+  throw std::runtime_error("camera '" + camera.name + "' has unsupported data_format '" +
+                           format + "' (expected mono8, mono16, rgb8, bgr8, rgba8 or bgra8)");
+}
+
+// AprilTag detection runs on a single-channel 8-bit luminance image, whatever
+// data_format the camera was converted to.
+cv::Mat toGray(const cv::Mat& image, const std::string& encoding)
+{
+  if (image.channels() == 1)
+  {
+    if (encoding == sensor_msgs::image_encodings::MONO16)
+    {
+      cv::Mat gray;
+      image.convertTo(gray, CV_8UC1, 1.0 / 256.0);
+      return gray;
+    }
+    return image;
+  }
+  cv::Mat gray;
+  if (encoding == sensor_msgs::image_encodings::RGB8)
+    cv::cvtColor(image, gray, cv::COLOR_RGB2GRAY);
+  else if (encoding == sensor_msgs::image_encodings::RGBA8)
+    cv::cvtColor(image, gray, cv::COLOR_RGBA2GRAY);
+  else if (encoding == sensor_msgs::image_encodings::BGRA8)
+    cv::cvtColor(image, gray, cv::COLOR_BGRA2GRAY);
+  else
+    cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
+  return gray;
+}
 
 class AprilTagLocalizationNode
 {
@@ -54,6 +101,7 @@ public:
       const core::CameraModel& camera = config_.cameras[index];
       if (!camera.enabled)
         continue;
+      camera_runtime_[index].target_encoding = resolveTargetEncoding(camera);
       if (config_.output.debug_images)
         camera_runtime_[index].debug_publisher = image_transport_.advertise("debug/" + camera.name, 1);
       image_subscribers_.push_back(image_transport_.subscribe(
@@ -76,6 +124,10 @@ public:
 private:
   void imageCallback(const sensor_msgs::ImageConstPtr& image, std::size_t camera_index)
   {
+    if (image->header.stamp.isZero())
+      ROS_WARN_THROTTLE(2.0, "camera %s publishes frames without a timestamp; these frames "
+                        "cannot be time-synchronized", config_.cameras[camera_index].name.c_str());
+    std::lock_guard<std::mutex> lock(sync_mutex_);
     CameraRuntime& runtime = camera_runtime_[camera_index];
     runtime.queue.push_back(image);
     const std::size_t maximum = static_cast<std::size_t>(std::max(1, config_.synchronization.queue_size));
@@ -85,12 +137,14 @@ private:
 
   sensor_msgs::ImageConstPtr nearestFrame(std::size_t camera_index, const ros::Time& target) const
   {
+    std::lock_guard<std::mutex> lock(sync_mutex_);
     sensor_msgs::ImageConstPtr best;
     double best_delta = std::numeric_limits<double>::infinity();
     for (const sensor_msgs::ImageConstPtr& frame : camera_runtime_[camera_index].queue)
     {
-      const ros::Time stamp = frame->header.stamp.isZero() ? target : frame->header.stamp;
-      const double delta = std::abs((stamp - target).toSec());
+      if (frame->header.stamp.isZero())
+        continue;
+      const double delta = std::abs((frame->header.stamp - target).toSec());
       if (delta < best_delta)
       {
         best_delta = delta;
@@ -102,6 +156,7 @@ private:
 
   bool latestEligibleAnchor(const ros::Time& cutoff, ros::Time& anchor) const
   {
+    std::lock_guard<std::mutex> lock(sync_mutex_);
     bool have_anchor = false;
     for (std::size_t index = 0; index < config_.cameras.size(); ++index)
     {
@@ -163,8 +218,9 @@ private:
       try
       {
         const cv_bridge::CvImagePtr converted = cv_bridge::toCvCopy(
-            frame, sensor_msgs::image_encodings::MONO8);
-        const cv::Mat gray = recognizer_.rectify(converted->image, camera);
+            frame, camera_runtime_[index].target_encoding);
+        const cv::Mat gray = recognizer_.rectify(
+            toGray(converted->image, camera_runtime_[index].target_encoding), camera);
         observation = recognizer_.recognize(gray, index);
         publishDebug(index, gray, observation, frame->header);
       }
@@ -298,6 +354,7 @@ private:
   core::FusionEngine fusion_engine_;
   core::PoseTemporalFilter pose_filter_;
   ros_adapter::RosTfBridge tf_bridge_;
+  mutable std::mutex sync_mutex_;  // guards the per-camera image queues shared with image callbacks
   std::vector<CameraRuntime> camera_runtime_;
   std::vector<image_transport::Subscriber> image_subscribers_;
   ros::Timer sync_timer_;

@@ -1,6 +1,7 @@
 #ifndef LASER_TAG_NAV_LOCALIZATION_ROS_TF_BRIDGE_H
 #define LASER_TAG_NAV_LOCALIZATION_ROS_TF_BRIDGE_H
 
+#include <mutex>
 #include <string>
 
 #include <ros/time.h>
@@ -42,6 +43,7 @@ private:
   core::OutputConfig config_;
   tf::TransformBroadcaster broadcaster_;
   tf::TransformListener listener_;
+  std::mutex tf_mutex_;  // guards held map->odom correction and TF timestamp state
   ros::Time last_tf_stamp_;
   std::string last_tf_parent_;
   std::string last_tf_child_;

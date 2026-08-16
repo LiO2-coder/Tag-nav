@@ -22,6 +22,15 @@ This split is intentionally internal: executable name, launch files, JSON v1
 and legacy configuration support, parameter precedence, private topics, message
 types, and TF modes remain unchanged.
 
+## Supported AprilTag families
+
+The detector links against apriltag 0.10.0 and supports its full built-in family
+set: `tag16h5`, `tag25h9`, `tag36h10`, `tag36h11`, `tagCircle21h7`,
+`tagCircle49h12`, `tagCustom48h12`, `tagStandard41h12`, and `tagStandard52h13`.
+`detector.tag_family` must name one of these; any other value fails at startup.
+Custom (self-generated) families are not configurable and require recompiling the
+node.
+
 The node requires these private parameters:
 
 * `cameras_json`: JSON string loaded by launch `textfile`. The version-1 object
