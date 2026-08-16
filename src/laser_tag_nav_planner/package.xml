@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>laser_tag_nav_planner</name>
+  <version>0.1.0</version>
+  <description>AprilTag grid-graph path planner and stop-and-go waypoint follower.</description>
+  <maintainer email="maintainer@example.com">laser-tag_nav maintainers</maintainer>
+  <license>BSD-3-Clause</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>roslib</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>nav_msgs</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>tf</build_depend>
+  <build_depend>message_generation</build_depend>
+  <build_depend>libjsoncpp-dev</build_depend>
+
+  <build_export_depend>message_runtime</build_export_depend>
+  <build_export_depend>libjsoncpp-dev</build_export_depend>
+
+  <exec_depend>roscpp</exec_depend>
+  <exec_depend>roslib</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>tf</exec_depend>
+  <exec_depend>message_runtime</exec_depend>
+  <exec_depend>libjsoncpp-dev</exec_depend>
+  <exec_depend>laser_tag_nav_localization</exec_depend>
+  <exec_depend>laser-tag_nav_bringup</exec_depend>
+</package>

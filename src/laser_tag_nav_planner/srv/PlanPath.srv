@@ -1,0 +1,6 @@
+int32 start_tag
+int32 goal_tag
+---
+bool success
+string message
+nav_msgs/Path path

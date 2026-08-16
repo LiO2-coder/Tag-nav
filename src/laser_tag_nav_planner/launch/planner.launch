@@ -1,0 +1,14 @@
+<launch>
+  <arg name="gui" default="false"/>
+
+  <!-- AprilTag localization + EKF + Gazebo (publishes map->odom and /apriltag_localization/pose). -->
+  <include file="$(find laser_tag_nav_localization)/launch/factory_apriltag_localization.launch">
+    <arg name="gui" value="$(arg gui)"/>
+  </include>
+
+  <node pkg="laser_tag_nav_planner" type="laser_tag_nav_planner_node"
+        name="laser_tag_nav_planner" output="screen">
+    <rosparam command="load" file="$(find laser_tag_nav_planner)/config/planner.yaml"/>
+    <remap from="cmd_vel" to="/agv/cmd_vel"/>
+  </node>
+</launch>
