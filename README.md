@@ -1,4 +1,4 @@
-# laser-tag_nav
+# tag_nav
 
 ROS 1 仓库 AGV 仿真与 AprilTag 定位项目。
 
@@ -11,7 +11,7 @@ localization node, and a static occupancy map that can be loaded by ROS
 
 ## 功能概览
 
-- 参数化 `warehouse_agv` 机器人模型：差速驱动、轮子/脚轮、IMU、Velodyne VLP-16、四个广角相机和一个下视鱼眼相机。
+- 参数化 `warehouse_agv` 机器人模型：差速驱动、轮子/脚轮、IMU、四个广角相机和一个下视鱼眼相机。
 - `factory.world` Gazebo Classic 世界：AprilTag 地面、围墙、货架、圆柱和立柱等障碍物。
 - `tag_nav_localization`：从多个相机同步图像中检测 `tag36h11`，按质量加权融合位姿，并发布有效性、质量和 TF 状态。
 - 工厂演示启动文件：Gazebo 里由 EKF 负责 `odom -> base_footprint`，AprilTag 定位节点负责 `map -> odom` 修正。
@@ -23,17 +23,17 @@ localization node, and a static occupancy map that can be loaded by ROS
 
 推荐环境：
 
-| 组件 | 版本 |
-| --- | --- |
-| Ubuntu | 20.04 |
-| ROS | Noetic |
-| Gazebo | Classic（由 `gazebo_ros` 提供） |
-| 构建工具 | `catkin_tools` |
-| 编译标准 | C++14 |
+
+| 组件     | 版本                           |
+| ---------- | -------------------------------- |
+| Ubuntu   | 20.04                          |
+| ROS      | Noetic                         |
+| Gazebo   | Classic（由`gazebo_ros` 提供） |
+| 构建工具 | `catkin_tools`                 |
+| 编译标准 | C++14                          |
 
 主要 ROS 依赖包括 `gazebo_ros`、`gazebo_plugins`、`xacro`、`robot_state_publisher`、
-`velodyne_description`、`velodyne_gazebo_plugins`、`robot_localization`、
-`cv_bridge`、`image_transport`、`tf` 和 `rviz`。使用静态地图时还需要安装
+`robot_localization`、`cv_bridge`、`image_transport`、`tf` 和 `rviz`。使用静态地图时还需要安装
 `map_server`。定位节点还需要系统的 OpenCV、JsonCpp 和 AprilTag 库（`pkg-config`
 名称为 `apriltag`）。
 
@@ -43,7 +43,7 @@ localization node, and a static occupancy map that can be loaded by ROS
 
 ```bash
 git clone --recurse-submodules <repository-url>
-cd laser-tag_nav
+cd tag_nav
 ```
 
 已有工作副本可执行：
@@ -142,16 +142,16 @@ roslaunch tag_nav_localization apriltag_localization.launch
 
 仿真中常用的输入/输出如下：
 
-| 名称 | 类型 | 说明 |
-| --- | --- | --- |
-| `/agv/cmd_vel` | `geometry_msgs/Twist` | 差速驱动速度指令 |
-| `/agv/odom` | `nav_msgs/Odometry` | Gazebo 轮式里程计 |
-| `/agv/imu/data` | `sensor_msgs/Imu` | 模拟 IMU |
-| `/agv/camera/<name>/image_raw` | `sensor_msgs/Image` | 相机图像，`name` 为 `front`、`rear`、`left`、`right` 或 `bottom` |
-| `/velodyne_points` | `sensor_msgs/PointCloud2` | VLP-16 点云 |
-| `/apriltag_localization/camera_best_tags` | `tag_nav_localization/CameraBestTagArray` | 每个相机的最佳标签结果 |
-| `/apriltag_localization/localization` | `tag_nav_localization/FusedAprilTagLocalization` | 融合位姿、质量和 TF 状态 |
-| `/apriltag_localization/pose` | `geometry_msgs/PoseWithCovarianceStamped` | 融合后的位姿 |
+
+| 名称                                      | 类型                                             | 说明                                                             |
+| ------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------ |
+| `/agv/cmd_vel`                            | `geometry_msgs/Twist`                            | 差速驱动速度指令                                                 |
+| `/agv/odom`                               | `nav_msgs/Odometry`                              | Gazebo 轮式里程计                                                |
+| `/agv/imu/data`                           | `sensor_msgs/Imu`                                | 模拟 IMU                                                         |
+| `/agv/camera/<name>/image_raw`            | `sensor_msgs/Image`                              | 相机图像，`name` 为 `front`、`rear`、`left`、`right` 或 `bottom` |
+| `/apriltag_localization/camera_best_tags` | `tag_nav_localization/CameraBestTagArray`        | 每个相机的最佳标签结果                                           |
+| `/apriltag_localization/localization`     | `tag_nav_localization/FusedAprilTagLocalization` | 融合位姿、质量和 TF 状态                                         |
+| `/apriltag_localization/pose`             | `geometry_msgs/PoseWithCovarianceStamped`        | 融合后的位姿                                                     |
 
 机器人状态发布器负责 `base_footprint` 到传感器链路的静态/固定关节。
 工厂定位演示的 TF 链为：
