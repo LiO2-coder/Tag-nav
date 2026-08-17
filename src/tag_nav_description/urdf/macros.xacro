@@ -43,20 +43,6 @@
     </inertial>
   </xacro:macro>
 
-  <xacro:macro name="cylinder_inertial" params="mass radius length">
-    <inertial>
-      <mass value="${mass}"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <inertia
-        ixx="${mass * (3.0 * radius * radius + length * length) / 12.0}"
-        ixy="0.0"
-        ixz="0.0"
-        iyy="${mass * (3.0 * radius * radius + length * length) / 12.0}"
-        iyz="0.0"
-        izz="${0.5 * mass * radius * radius}"/>
-    </inertial>
-  </xacro:macro>
-
   <xacro:macro name="box_link" params="name mass x y z material gazebo_material">
     <link name="${name}">
       <visual>
@@ -71,28 +57,6 @@
         </geometry>
       </collision>
       <xacro:box_inertial mass="${mass}" x="${x}" y="${y}" z="${z}"/>
-    </link>
-    <gazebo reference="${name}">
-      <material>${gazebo_material}</material>
-    </gazebo>
-  </xacro:macro>
-
-  <xacro:macro name="laser_base" params="name radius length mass material gazebo_material">
-    <link name="${name}">
-      <visual>
-        <origin xyz="0 0 ${length / 2.0}" rpy="0 0 0"/>
-        <geometry>
-          <cylinder radius="${radius}" length="${length}"/>
-        </geometry>
-        <material name="${material}"/>
-      </visual>
-      <collision>
-        <origin xyz="0 0 ${length / 2.0}" rpy="0 0 0"/>
-        <geometry>
-          <cylinder radius="${radius}" length="${length}"/>
-        </geometry>
-      </collision>
-      <xacro:cylinder_inertial mass="${mass}" radius="${radius}" length="${length}"/>
     </link>
     <gazebo reference="${name}">
       <material>${gazebo_material}</material>
