@@ -4,13 +4,13 @@
 #include <stdexcept>
 #include <string>
 
-#include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <geometry_msgs/Twist.h>
 #include <nav_msgs/Path.h>
 #include <ros/ros.h>
 #include <std_msgs/Empty.h>
 #include <std_msgs/String.h>
 #include <tf/transform_datatypes.h>
+#include <tf/transform_listener.h>
 
 #include <laser_tag_nav_planner/PlanPath.h>
 #include <laser_tag_nav_planner/core/astar.h>
@@ -49,7 +49,6 @@ public:
     path_publisher_ = nh_.advertise<nav_msgs::Path>("planner/path", 1, true);
     state_publisher_ = nh_.advertise<std_msgs::String>("planner/state", 1);
     cmd_vel_publisher_ = nh_.advertise<geometry_msgs::Twist>("cmd_vel", 1);
-    pose_subscriber_ = nh_.subscribe(config_.pose_topic, 1, &PlannerNode::poseCallback, this);
     plan_service_ = nh_.advertiseService("planner/plan_path", &PlannerNode::planCallback, this);
     cancel_subscriber_ = nh_.subscribe("planner/cancel", 1, &PlannerNode::cancelCallback, this);
 
@@ -80,27 +79,33 @@ public:
   }
 
 private:
-  void poseCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& pose)
-  {
-    std::lock_guard<std::mutex> lock(pose_mutex_);
-    have_pose_ = true;
-    pose_stamp_ = pose->header.stamp;
-    pose_x_ = pose->pose.pose.position.x;
-    pose_y_ = pose->pose.pose.position.y;
-    pose_yaw_ = tf::getYaw(pose->pose.pose.orientation);
-  }
-
   void controlTick(const ros::TimerEvent&)
   {
     const ros::Time now = ros::Time::now();
     applyPendingPlan();
-    {
-      std::lock_guard<std::mutex> lock(pose_mutex_);
-      if (have_pose_)
-        follower_.setPose(pose_stamp_, pose_x_, pose_y_, pose_yaw_);
-    }
+    updatePose(now);
     cmd_vel_publisher_.publish(follower_.update(now));
     publishState();
+  }
+
+  // Reads the combined EKF+tag pose straight from TF (map -> base_footprint),
+  // exactly like move_base's costmaps do.
+  void updatePose(const ros::Time& now)
+  {
+    tf::StampedTransform map_to_base;
+    try
+    {
+      tf_listener_.lookupTransform(config_.map_frame, config_.base_frame, ros::Time(0),
+                                   map_to_base);
+      follower_.setPose(now, map_to_base.getOrigin().x(), map_to_base.getOrigin().y(),
+                        tf::getYaw(map_to_base.getRotation()));
+    }
+    catch (const tf::TransformException& error)
+    {
+      ROS_WARN_THROTTLE(2.0, "TF lookup %s -> %s failed: %s", config_.map_frame.c_str(),
+                        config_.base_frame.c_str(), error.what());
+      follower_.clearPose();
+    }
   }
 
   // Applies a plan/cancel queued by the service or cancel callback. The follower
@@ -191,17 +196,11 @@ private:
   ros::Publisher path_publisher_;
   ros::Publisher state_publisher_;
   ros::Publisher cmd_vel_publisher_;
-  ros::Subscriber pose_subscriber_;
   ros::ServiceServer plan_service_;
   ros::Subscriber cancel_subscriber_;
   ros::Timer control_timer_;
 
-  std::mutex pose_mutex_;  // guards pose_* shared between the pose callback and control tick
-  bool have_pose_ = false;
-  ros::Time pose_stamp_;
-  double pose_x_ = 0.0;
-  double pose_y_ = 0.0;
-  double pose_yaw_ = 0.0;
+  tf::TransformListener tf_listener_;
 
   std::mutex plan_mutex_;  // guards the pending plan/cancel handoff to the control tick
   bool has_pending_path_ = false;

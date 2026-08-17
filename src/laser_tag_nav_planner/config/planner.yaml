@@ -16,6 +16,6 @@ grid_spacing: 1.0
 controller_rate: 20.0
 pose_timeout: 0.5
 map_frame: map
-pose_topic: "/apriltag_localization/pose"
+base_frame: base_footprint
 connectivity_json: "package://laser_tag_nav_planner/config/connectivity.json"
 tag_map_file: "package://laser-tag_nav_bringup/worlds/maps/apriltagMap.json"

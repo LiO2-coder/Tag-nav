@@ -16,8 +16,8 @@ struct PlannerConfig
   int goal_tag = 0;
   std::string connectivity_json;
   std::string tag_map_file;
-  std::string pose_topic = "/apriltag_localization/pose";
   std::string map_frame = "map";
+  std::string base_frame = "base_footprint";
   double linear_velocity = 0.30;
   double angular_velocity = 0.50;
   double position_tolerance = 0.05;

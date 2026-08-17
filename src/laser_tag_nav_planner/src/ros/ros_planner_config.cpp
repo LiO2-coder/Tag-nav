@@ -51,8 +51,8 @@ PlannerConfig RosPlannerConfigLoader::load() const
 
   private_node_handle_.param<std::string>("tag_map_file", config.tag_map_file,
       "package://laser-tag_nav_bringup/worlds/maps/apriltagMap.json");
-  private_node_handle_.param<std::string>("pose_topic", config.pose_topic, config.pose_topic);
   private_node_handle_.param<std::string>("map_frame", config.map_frame, config.map_frame);
+  private_node_handle_.param<std::string>("base_frame", config.base_frame, config.base_frame);
   private_node_handle_.param("linear_velocity", config.linear_velocity, config.linear_velocity);
   private_node_handle_.param("angular_velocity", config.angular_velocity, config.angular_velocity);
   private_node_handle_.param("position_tolerance", config.position_tolerance,

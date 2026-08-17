@@ -42,12 +42,20 @@ public:
 
   void setPose(const ros::Time& stamp, double x, double y, double yaw);
 
+  // Marks the pose as unavailable; update() then reports LOCALIZATION_LOST and
+  // commands zero velocity.
+  void clearPose();
+
   geometry_msgs::Twist update(const ros::Time& now);
 
   FollowerState state() const { return state_; }
   std::size_t current_index() const { return target_index_; }
 
 private:
+  // Forward (along-track) distance to a waypoint in the robot frame: positive
+  // while the tag is still ahead, <= 0 once the robot has reached/passed it.
+  double alongTrack(const core::Waypoint& waypoint) const;
+
   PlannerConfig config_;
   core::PathResult path_;
   std::size_t target_index_ = 0;
