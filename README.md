@@ -7,16 +7,16 @@ factory world, simulated sensors, a quality-weighted multi-camera AprilTag
 localization node, and a static occupancy map that can be loaded by ROS
 `map_server`.
 
-> 项目当前面向 ROS Noetic，仍处于持续开发阶段。公开发布前请根据实际
-> 仓库地址、维护者信息和硬件接口补充本文档中的项目元数据。
+> 项目当前面向 ROS Noetic，仍处于持续开发阶段。
 
 ## 功能概览
 
 - 参数化 `warehouse_agv` 机器人模型：差速驱动、轮子/脚轮、IMU、Velodyne VLP-16、四个广角相机和一个下视鱼眼相机。
 - `factory.world` Gazebo Classic 世界：AprilTag 地面、围墙、货架、圆柱和立柱等障碍物。
-- `laser_tag_nav_localization`：从多个相机同步图像中检测 `tag36h11`，按质量加权融合位姿，并发布有效性、质量和 TF 状态。
+- `tag_nav_localization`：从多个相机同步图像中检测 `tag36h11`，按质量加权融合位姿，并发布有效性、质量和 TF 状态。
 - 工厂演示启动文件：Gazebo 里由 EKF 负责 `odom -> base_footprint`，AprilTag 定位节点负责 `map -> odom` 修正。
 - `factory_map.pgm` / `factory_map.yaml`：依据 Gazebo 碰撞几何投影生成的 `map_server` 静态地图。
+- `tag_nav_planner`：基于标签网格图（AprilTag grid graph）的 A* 路径规划器与定点跟随控制器，提供 RViz/独立 GUI 两种操控方式。
 - `src/3rd_party/pytagmapper`：用于 AprilTag 地图/工具链的第三方子模块。
 
 ## 软件环境
@@ -84,7 +84,7 @@ source devel/setup.bash
 也可以只构建相关包：
 
 ```bash
-catkin build laser-tag_nav_description laser-tag_nav_bringup laser_tag_nav_localization
+catkin build tag_nav_description tag_nav_bringup tag_nav_localization tag_nav_planner
 ```
 
 ## 快速开始
@@ -94,23 +94,23 @@ catkin build laser-tag_nav_description laser-tag_nav_bringup laser_tag_nav_local
 ```bash
 source /opt/ros/noetic/setup.bash
 source devel/setup.bash
-roslaunch laser-tag_nav_bringup factory_gazebo.launch
+roslaunch tag_nav_bringup factory_gazebo.launch
 ```
 
 常用参数：
 
 ```bash
-roslaunch laser-tag_nav_bringup factory_gazebo.launch gui:=false paused:=false
+roslaunch tag_nav_bringup factory_gazebo.launch gui:=false paused:=false
 ```
 
 启动文件默认使用 `/agv` 命名空间、机器人名 `warehouse_agv` 和
-`src/laser-tag_nav_bringup/worlds/factory.world`。可通过 `robot_name`、
+`src/tag_nav_bringup/worlds/factory.world`。可通过 `robot_name`、
 `namespace`、`x`、`y`、`z` 和 `yaw` 调整机器人生成参数。
 
 ### 2. 仅查看机器人模型
 
 ```bash
-roslaunch laser-tag_nav_description display.launch use_rviz:=true
+roslaunch tag_nav_description display.launch use_rviz:=true
 ```
 
 ### 3. 启动 AprilTag 定位演示
@@ -119,7 +119,7 @@ roslaunch laser-tag_nav_description display.launch use_rviz:=true
 AprilTag 定位节点：
 
 ```bash
-roslaunch laser_tag_nav_localization factory_apriltag_localization.launch gui:=false
+roslaunch tag_nav_bringup factory_apriltag_localization.launch gui:=false
 ```
 
 在这个模式中：
@@ -132,7 +132,7 @@ roslaunch laser_tag_nav_localization factory_apriltag_localization.launch gui:=f
 单独启动定位节点时：
 
 ```bash
-roslaunch laser_tag_nav_localization apriltag_localization.launch
+roslaunch tag_nav_localization apriltag_localization.launch
 ```
 
 该节点要求私有参数 `~cameras_json`。默认启动文件会将
@@ -149,8 +149,8 @@ roslaunch laser_tag_nav_localization apriltag_localization.launch
 | `/agv/imu/data` | `sensor_msgs/Imu` | 模拟 IMU |
 | `/agv/camera/<name>/image_raw` | `sensor_msgs/Image` | 相机图像，`name` 为 `front`、`rear`、`left`、`right` 或 `bottom` |
 | `/velodyne_points` | `sensor_msgs/PointCloud2` | VLP-16 点云 |
-| `/apriltag_localization/camera_best_tags` | `laser_tag_nav_localization/CameraBestTagArray` | 每个相机的最佳标签结果 |
-| `/apriltag_localization/localization` | `laser_tag_nav_localization/FusedAprilTagLocalization` | 融合位姿、质量和 TF 状态 |
+| `/apriltag_localization/camera_best_tags` | `tag_nav_localization/CameraBestTagArray` | 每个相机的最佳标签结果 |
+| `/apriltag_localization/localization` | `tag_nav_localization/FusedAprilTagLocalization` | 融合位姿、质量和 TF 状态 |
 | `/apriltag_localization/pose` | `geometry_msgs/PoseWithCovarianceStamped` | 融合后的位姿 |
 
 机器人状态发布器负责 `base_footprint` 到传感器链路的静态/固定关节。
@@ -231,7 +231,7 @@ Gazebo 重新开始发布。该检查只影响 TF，不影响 `~localization` �
 <odometrySource>encoder</odometrySource>
 ```
 
-并在 [ekf_odom.yaml](src/laser_tag_nav_localization/config/ekf_odom.yaml) 中关闭
+并在 [ekf_odom.yaml](src/tag_nav_localization/config/ekf_odom.yaml) 中关闭
 IMU 的绝对世界航向，只融合角速度等局部信息。这样手动改变 Gazebo 世界位姿时，
 没有对应的轮编码器/角速度运动，`odom -> base_footprint` 保持不变；视觉节点
 通过新的标签观测更新 `map -> odom`，从而修正组合后的 `map -> base_footprint`。
@@ -291,7 +291,7 @@ TF 的发布失败。项目 URDF 中没有依赖这个话题；只要 `/agv/cmd_
 
 ```bash
 # 不需要 Gazebo GUI 时，直接关闭 GUI，避免 JointControlWidget
-roslaunch laser_tag_nav_localization factory_apriltag_localization.launch gui:=false
+roslaunch tag_nav_bringup factory_apriltag_localization.launch gui:=false
 
 # 多网卡、VPN 或 Docker 环境下，指定双方可达的真实网卡地址
 export GAZEBO_IP=10.10.151.14
@@ -334,14 +334,14 @@ rosnode info /apriltag_localization
 
 地图文件位于：
 
-- `src/laser-tag_nav_bringup/maps/factory_map.yaml`
-- `src/laser-tag_nav_bringup/maps/factory_map.pgm`
+- `src/tag_nav_bringup/maps/factory_map.yaml`
+- `src/tag_nav_bringup/maps/factory_map.pgm`
 
 加载地图：
 
 ```bash
 rosrun map_server map_server \
- "$(rospack find laser-tag_nav_bringup)/maps/factory_map.yaml"
+ "$(rospack find tag_nav_bringup)/maps/factory_map.yaml"
 ```
 
 地图分辨率为 `0.05 m/pixel`，原点为 `[-10.15, -12.65, 0.0]`。这是一张由
@@ -351,13 +351,13 @@ SLAM 地图。
 当世界中的货架或墙体发生变化时，可重新生成地图：
 
 ```bash
-rosrun laser-tag_nav_bringup generate_factory_map.py
+rosrun tag_nav_bringup generate_factory_map.py
 ```
 
 脚本默认读取 `worlds/factory.world` 并写入 `maps/`，也支持自定义路径：
 
 ```bash
-rosrun laser-tag_nav_bringup generate_factory_map.py \
+rosrun tag_nav_bringup generate_factory_map.py \
   --world /path/to/world.sdf \
   --output-dir /path/to/maps
 ```
@@ -368,7 +368,7 @@ rosrun laser-tag_nav_bringup generate_factory_map.py \
 
 ```bash
 sudo apt install ros-noetic-navigation
-roslaunch laser-tag_nav_bringup factory_navigation.launch
+roslaunch tag_nav_bringup factory_navigation.launch
 ```
 
 该启动文件会启动工厂 Gazebo、AprilTag 定位、`map_server`、`move_base` 和 RViz。
@@ -381,10 +381,43 @@ Gazebo GUI 与 RViz；若只想关闭 Gazebo GUI 而保留 RViz，可另传 `rvi
 此配置只使用 `factory_map` 静态障碍层，未接入 `/velodyne_points` 或动态避障，目的是
 隔离并验证标签定位对导航闭环的影响。
 
+## 标签图规划器（A* + waypoint 跟随）
+
+规划器以 `apriltagMap.json` 中的标签网格为图，在 `start_tag` 与 `goal_tag`
+之间运行 A*（8 方向连通），并驱动 AGV 沿规划的标签路径定点跟随
+（stop-and-go）：
+
+```bash
+roslaunch tag_nav_bringup planner.launch
+```
+
+该启动文件会启动工厂 Gazebo、AprilTag 定位、`map_server` 和规划器节点，
+默认启用 RViz 显示（`rviz:=false` 关闭）。规划参数位于
+[planner.yaml](src/tag_nav_planner/config/planner.yaml)：设
+`auto_start: true` 会在启动时自动规划 `start_tag -> goal_tag`；保持
+`false` 时通过 `tag_nav_gui.py`（或 `~plan_path` 服务）触发规划：
+
+```bash
+rosrun tag_nav_planner tag_nav_gui.py
+```
+
+单独调试规划器节点（不含定位/Gazebo）时，需要外部提供
+`map -> base_footprint` TF 链：
+
+```bash
+roslaunch tag_nav_planner planner_node.launch
+```
+
+标签连通性可用 `tag_connectivity_editor.py` 可视化编辑：
+
+```bash
+rosrun tag_nav_planner tag_connectivity_editor.py
+```
+
 ## AprilTag 定位配置
 
-定位配置文件为 [gazebo_cameras.json](src/laser_tag_nav_localization/config/gazebo_cameras.json)，
-标签地图为 [apriltagMap.json](src/laser-tag_nav_bringup/worlds/maps/apriltagMap.json)。
+定位配置文件为 [gazebo_cameras.json](src/tag_nav_localization/config/gazebo_cameras.json)，
+标签地图为 [apriltagMap.json](src/tag_nav_bringup/worlds/maps/apriltagMap.json)。
 
 配置文件包含以下主要部分：
 
@@ -401,7 +434,7 @@ Gazebo GUI 与 RViz；若只想关闭 Gazebo GUI 而保留 RViz，可另传 `rvi
 也可以通过启动参数覆盖标签地图：
 
 ```bash
-roslaunch laser_tag_nav_localization apriltag_localization.launch \
+roslaunch tag_nav_localization apriltag_localization.launch \
   tag_map_file:=/absolute/path/to/apriltagMap.json
 ```
 
@@ -421,34 +454,39 @@ rosrun tf view_frames
 rosrun tf tf_echo map base_footprint
 
 # 展开并检查 Xacro
-rosrun xacro xacro src/laser-tag_nav_description/urdf/robot.urdf.xacro \
+rosrun xacro xacro src/tag_nav_description/urdf/robot.urdf.xacro \
   > /tmp/warehouse_agv.urdf
-
-# 运行定位包测试
-catkin test laser_tag_nav_localization --no-status
 ```
 
 ## 目录结构
 
 ```text
 .
+├── LICENSE
 ├── README.md
 ├── .gitmodules
 └── src/
-    ├── laser-tag_nav_bringup/
+    ├── tag_nav_bringup/          # 完整演示 launch、地图、rviz、worlds
     │   ├── launch/factory_gazebo.launch
+    │   ├── launch/factory_navigation.launch
+    │   ├── launch/planner.launch
     │   ├── maps/factory_map.{yaml,pgm}
     │   ├── scripts/generate_factory_map.py
     │   └── worlds/factory.world
-    ├── laser-tag_nav_description/
+    ├── tag_nav_description/
     │   ├── launch/{display,gazebo}.launch
     │   ├── rviz/warehouse_agv.rviz
     │   └── urdf/
-    ├── laser_tag_nav_localization/
+    ├── tag_nav_localization/
     │   ├── config/{gazebo_cameras.json,ekf_odom.yaml}
-    │   ├── launch/{apriltag_localization,factory_apriltag_localization}.launch
+    │   ├── launch/apriltag_localization.launch
     │   ├── msg/
     │   └── src/apriltag_localization_node.cpp
+    ├── tag_nav_planner/
+    │   ├── config/{planner.yaml,connectivity.json}
+    │   ├── launch/planner_node.launch
+    │   ├── scripts/{tag_nav_gui,tag_connectivity_editor}.py
+    │   └── srv/PlanPath.srv
     └── 3rd_party/pytagmapper/   # Git submodule
 ```
 
@@ -458,7 +496,7 @@ catkin test laser_tag_nav_localization --no-status
 
 1. Fork 仓库并创建功能分支；
 2. 保持 ROS 包依赖写在对应的 `package.xml` 中；
-3. 提交前运行 `catkin build` 和相关测试；
+3. 提交前运行 `catkin build` 确认可正常构建；
 4. 在 issue 或 PR 中说明 ROS 发行版、Gazebo 版本、启动命令和复现步骤。
 
 请不要提交 `build/`、`devel/`、`logs/`、`install/` 等生成目录；这些目录已在
@@ -466,8 +504,9 @@ catkin test laser_tag_nav_localization --no-status
 
 ## 许可证与第三方代码
 
-三个 ROS 包的 `package.xml` 当前声明为 BSD-3-Clause。仓库根目录尚未包含正式的
-`LICENSE` 文件；在公开发布前，请补充与所有者确认过的许可证文本、维护者姓名和联系邮箱。
+本仓库（含 `tag_nav_bringup`、`tag_nav_description`、`tag_nav_localization`、
+`tag_nav_planner` 四个 ROS 包）以 MIT 许可证发布，详见根目录 [LICENSE](LICENSE)。
+Copyright (c) 2026 LiO2-coder。
 
 `src/3rd_party/pytagmapper` 是独立的 Git 子模块，遵循其上游仓库的许可证和版权声明；
 使用、修改或重新分发时请同时遵守上游条款。
@@ -475,8 +514,9 @@ catkin test laser_tag_nav_localization --no-status
 ## English summary
 
 `laser-tag_nav` is a ROS Noetic / Gazebo Classic warehouse AGV simulation with
-multi-camera AprilTag localization. It includes a parameterized AGV URDF,
-VLP-16 and IMU simulation, a tagged factory world, EKF odometry, quality-weighted
-2D/2.5D/3D tag-pose fusion, and a `map_server`-compatible factory occupancy map.
-See the sections above for installation, launch commands, topics, TF ownership,
-configuration, and contribution guidelines.
+multi-camera AprilTag localization and tag-grid path planning. It includes a
+parameterized AGV URDF, VLP-16 and IMU simulation, a tagged factory world, EKF
+odometry, quality-weighted 2D/2.5D/3D tag-pose fusion, an A* planner over the
+tag graph with stop-and-go waypoint following, and a `map_server`-compatible
+factory occupancy map. See the sections above for installation, launch
+commands, topics, TF ownership, configuration, and contribution guidelines.
