@@ -1,0 +1,22 @@
+<launch>
+  <arg name="cameras_json" default="$(find tag_nav_localization)/config/gazebo_cameras.json"/>
+  <arg name="tag_map_file" default=""/>
+  <arg name="publish_tf" default=""/>
+  <arg name="tf_mode" default=""/>
+  <arg name="odom_frame" default=""/>
+  <arg name="tf_lookup_timeout" default=""/>
+  <arg name="debug_images" default=""/>
+  <arg name="process_rate" default=""/>
+
+  <node pkg="tag_nav_localization" type="apriltag_localization_node"
+        name="apriltag_localization" output="screen">
+    <param name="cameras_json" textfile="$(arg cameras_json)"/>
+    <param if="$(eval arg('tag_map_file') != '')" name="tag_map_file" value="$(arg tag_map_file)"/>
+    <param if="$(eval arg('publish_tf') != '')" name="publish_tf" value="$(arg publish_tf)"/>
+    <param if="$(eval arg('tf_mode') != '')" name="tf_mode" value="$(arg tf_mode)"/>
+    <param if="$(eval arg('odom_frame') != '')" name="odom_frame" value="$(arg odom_frame)"/>
+    <param if="$(eval arg('tf_lookup_timeout') != '')" name="tf_lookup_timeout" value="$(arg tf_lookup_timeout)"/>
+    <param if="$(eval arg('debug_images') != '')" name="debug_images" value="$(arg debug_images)"/>
+    <param if="$(eval arg('process_rate') != '')" name="process_rate" value="$(arg process_rate)"/>
+  </node>
+</launch>

@@ -1,0 +1,21 @@
+# Planner runtime parameters. Loaded into the node's private namespace via
+# <rosparam> in planner.launch. start_tag and goal_tag are tag ids from the tag
+# map; connectivity_json holds the per-tag 8-bit direction masks.
+start_tag: 0
+goal_tag: 474
+# When false the planner starts idle and waits for a /planner/plan_path service
+# call (the nav GUI is the trigger). Set true to plan start->goal at startup.
+auto_start: false
+linear_velocity: 0.30
+angular_velocity: 0.50
+position_tolerance: 0.05
+heading_tolerance: 0.05
+slow_radius: 0.50
+allow_diagonal: true
+grid_spacing: 1.0
+controller_rate: 20.0
+pose_timeout: 0.5
+map_frame: map
+base_frame: base_footprint
+connectivity_json: "package://tag_nav_planner/config/connectivity.json"
+tag_map_file: "package://tag_nav_bringup/worlds/maps/apriltagMap.json"

@@ -1,0 +1,10 @@
+<launch>
+  <!-- Single-node debug launch for the tag-graph planner. Requires a running
+       localization stack that provides the map->base_footprint TF chain, e.g.
+       the tag_nav_bringup factory_apriltag_localization.launch. -->
+  <node pkg="tag_nav_planner" type="tag_nav_planner_node"
+        name="tag_nav_planner" output="screen">
+    <rosparam command="load" file="$(find tag_nav_planner)/config/planner.yaml"/>
+    <remap from="cmd_vel" to="/agv/cmd_vel"/>
+  </node>
+</launch>

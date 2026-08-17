@@ -1,0 +1,162 @@
+{
+  "schema_version": 1,
+  "map": {
+    "uri": "package://tag_nav_bringup/worlds/maps/apriltagMap.json"
+  },
+  "quality": {
+    "mask": "1111",
+    "metric_exponents": {
+      "area": 1.0,
+      "distortion": 1.0,
+      "margin": 1.0,
+      "sharpness": 1.0
+    },
+    "area_reference_px": 1600.0,
+    "distortion_scale": 0.20,
+    "margin_reference": 100.0,
+    "sharpness_reference": 128.0,
+    "min_quality": 0.01
+  },
+  "detector": {
+    "tag_family": "tag36h11",
+    "threads": 2,
+    "decimate": 1.0,
+    "blur": 0.0,
+    "refine_edges": true,
+    "max_hamming_dist": 0
+  },
+  "synchronization": {
+    "queue_size": 10,
+    "slop_sec": 0.05,
+    "wait_sec": 0.02,
+    "min_batch_interval_sec": 0.0667
+  },
+  "runtime": {
+    "process_rate_hz": 15.0,
+    "localization_timeout_sec": 0.50
+  },
+  "fusion": {
+    "mode": "auto",
+    "min_contributing_cameras": 1,
+    "camera_confidence_multipliers": {},
+    "outlier_gate": {
+      "enabled": false,
+      "max_position_residual_m": 0.30,
+      "max_yaw_residual_rad": 0.35,
+      "max_orientation_residual_rad": 0.35
+    },
+    "min_position_stddev_m": 0.02,
+    "min_yaw_stddev_rad": 0.035
+  },
+  "temporal_filter": {
+    "enabled": true,
+    "position_time_constant_sec": 0.25,
+    "orientation_time_constant_sec": 0.25,
+    "max_dt_sec": 1.0
+  },
+  "validation": {
+    "min_tag_area_px": 0.0,
+    "max_tag_range_m": 0.0,
+    "reject_unmapped_tags": true,
+    "stale_frame_timeout_sec": 0.20
+  },
+  "output": {
+    "map_frame": "map",
+    "odom_frame": "odom",
+    "base_frame": "base_footprint",
+    "tf_mode": "correction",
+    "publish_tf": true,
+    "tf_lookup_timeout_sec": 0.05,
+    "correction_tf_tolerance_sec": 0.25,
+    "correction_tf_publish_rate_hz": 10.0,
+    "debug_images": false,
+    "invalid_variance": 1000000.0
+  },
+  "cameras": [
+    {
+      "name": "front",
+      "enabled": false,
+      "image_topic": "/agv/camera/front/image_raw",
+      "transport": "raw",
+      "data_format": "rgb8",
+      "frame_id": "camera_front_optical_frame",
+      "intrinsics": {
+        "K": [184.752086, 0.0, 320.0, 0.0, 184.752086, 240.0, 0.0, 0.0, 1.0],
+        "D": [0.0, 0.0, 0.0, 0.0, 0.0],
+        "distortion_model": "plumb_bob"
+      },
+      "base_to_camera": {
+        "translation": [0.43, 0.0, 0.36],
+        "rotation_rpy": [-1.605702912, 0.0, -1.570796327]
+      }
+    },
+    {
+      "name": "rear",
+      "enabled": false,
+      "image_topic": "/agv/camera/rear/image_raw",
+      "transport": "raw",
+      "data_format": "rgb8",
+      "frame_id": "camera_rear_optical_frame",
+      "intrinsics": {
+        "K": [184.752086, 0.0, 320.0, 0.0, 184.752086, 240.0, 0.0, 0.0, 1.0],
+        "D": [0.0, 0.0, 0.0, 0.0, 0.0],
+        "distortion_model": "plumb_bob"
+      },
+      "base_to_camera": {
+        "translation": [-0.43, 0.0, 0.36],
+        "rotation_rpy": [-1.605702912, 0.0, 1.570796327]
+      }
+    },
+    {
+      "name": "left",
+      "enabled": false,
+      "image_topic": "/agv/camera/left/image_raw",
+      "transport": "raw",
+      "data_format": "rgb8",
+      "frame_id": "camera_left_optical_frame",
+      "intrinsics": {
+        "K": [184.752086, 0.0, 320.0, 0.0, 184.752086, 240.0, 0.0, 0.0, 1.0],
+        "D": [0.0, 0.0, 0.0, 0.0, 0.0],
+        "distortion_model": "plumb_bob"
+      },
+      "base_to_camera": {
+        "translation": [0.0, 0.32, 0.36],
+        "rotation_rpy": [-1.605702912, 0.0, 0.0]
+      }
+    },
+    {
+      "name": "right",
+      "enabled": false,
+      "image_topic": "/agv/camera/right/image_raw",
+      "transport": "raw",
+      "data_format": "rgb8",
+      "frame_id": "camera_right_optical_frame",
+      "intrinsics": {
+        "K": [184.752086, 0.0, 320.0, 0.0, 184.752086, 240.0, 0.0, 0.0, 1.0],
+        "D": [0.0, 0.0, 0.0, 0.0, 0.0],
+        "distortion_model": "plumb_bob"
+      },
+      "base_to_camera": {
+        "translation": [0.0, -0.32, 0.36],
+        "rotation_rpy": [-1.605702912, 0.0, -3.141592654]
+      }
+    },
+    {
+      "name": "bottom",
+      "enabled": true,
+      "image_topic": "/agv/camera/bottom/image_raw",
+      "transport": "raw",
+      "data_format": "rgb8",
+      "frame_id": "camera_bottom_optical_frame",
+      "intrinsics": {
+        "K": [203.7183, 0.0, 320.0, 0.0, 203.7183, 240.0, 0.0, 0.0, 1.0],
+        "D": [0.0, 0.0, 0.0, 0.0],
+        "distortion_model": "equidistant"
+      },
+      "base_to_camera": {
+        "translation": [0.0, 0.0, 0.10],
+        "rotation_rpy": [-3.141592654, 0.0, -1.570796327]
+      }
+    }
+  ]
+}

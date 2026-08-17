@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="robot_name" default="warehouse_agv"/>
+  <arg name="namespace" default="/agv"/>
+  <arg name="use_rviz" default="true"/>
+
+  <param name="/use_sim_time" value="false"/>
+
+  <param
+    name="robot_description"
+    command="$(find xacro)/xacro $(find tag_nav_description)/urdf/robot.urdf.xacro robot_name:=$(arg robot_name) namespace:=$(arg namespace)"/>
+
+  <node
+    name="robot_state_publisher"
+    pkg="robot_state_publisher"
+    type="robot_state_publisher"
+    output="screen">
+    <param name="publish_frequency" value="50.0"/>
+  </node>
+
+  <node
+    name="joint_state_publisher"
+    pkg="joint_state_publisher"
+    type="joint_state_publisher"
+    output="screen"/>
+    
+  <node
+    if="$(arg use_rviz)"
+    name="rviz"
+    pkg="rviz"
+    type="rviz"
+    args="-d $(find tag_nav_description)/rviz/warehouse_agv.rviz"
+    output="screen"/>
+</launch>
