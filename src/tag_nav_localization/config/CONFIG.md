@@ -1,5 +1,7 @@
 # AprilTag 定位配置说明
 
+[English](CONFIG_en.md)
+
 本目录包含 AprilTag 定位节点的配置文件。
 
 ## 配置文件
@@ -10,7 +12,7 @@
 
 #### 配置结构
 
-```json
+```text
 {
   "schema_version": 1,
   "map": { ... },
@@ -94,6 +96,8 @@ AprilTag 检测器参数：
 | `camera_confidence_multipliers` | object | {} | 各相机置信度乘数 |
 | `outlier_gate.enabled` | bool | false | 是否启用离群值过滤 |
 | `outlier_gate.max_position_residual_m` | float | 0.30 | 最大位置残差（米） |
+| `outlier_gate.max_yaw_residual_rad` | float | 0.35 | 最大航向残差（弧度） |
+| `outlier_gate.max_orientation_residual_rad` | float | 0.35 | 最大姿态残差（弧度） |
 | `min_position_stddev_m` | float | 0.02 | 最小位置标准差（米） |
 | `min_yaw_stddev_rad` | float | 0.035 | 最小航向标准差（弧度） |
 
@@ -150,62 +154,16 @@ AprilTag 检测器参数：
 | `frame_id` | string | 相机坐标系 |
 | `intrinsics` | object | 相机内参 |
 | `intrinsics.K` | array[9] | 相机内参矩阵（fx, fy, cx, cy） |
-| `intrinsics.D` | array[5] | 畸变系数 |
+| `intrinsics.D` | array | 畸变系数；`equidistant`/`fisheye` 使用 4 个参数，`plumb_bob` 按相机标定结果填写 |
 | `intrinsics.distortion_model` | string | 畸变模型（plumb_bob/equidistant） |
 | `base_to_camera.translation` | array[3] | 基座到相机的平移 |
 | `base_to_camera.rotation_rpy` | array[3] | 基座到相机的旋转（roll/pitch/yaw） |
 
 ### apriltagMap.json
 
-AprilTag 地图文件，定义标签在世界坐标系中的位置。
+标签地图定义标签在地图坐标系中的位姿、边长和地图类型。默认地图的格式、`2d`/`2.5d`/`3d` 位姿数组、`schema_version` 和生成流程统一维护在 [AprilTag 地图配置说明](../../tag_nav_bringup/worlds/maps/CONFIG.md) 中。
 
-#### 配置结构
-
-```json
-{
-  "schema_version": 1,
-  "tag_side_lengths": {
-    "default": 0.10
-  },
-  "tag_locations": {
-    "0": [-9.0, 12.0, 0.0],
-    "1": [-8.0, 12.0, 0.0],
-    ...
-  },
-  "map_type": "2d"
-}
-```
-
-#### 配置项详解
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `schema_version` | int | 地图格式版本号 |
-| `tag_side_lengths` | object | 标签边长配置 |
-| `tag_side_lengths.default` | float | 默认标签边长（米） |
-| `tag_locations` | object | 标签位置映射（ID → [x, y, z]） |
-| `map_type` | string | 地图类型（2d/3d） |
-
-#### 标签位置格式
-
-每个标签的位置使用世界坐标系表示：
-
-```json
-"0": [x, y, z]
-```
-
-- `x`：世界坐标 X 方向位置（米）
-- `y`：世界坐标 Y 方向位置（米）
-- `z`：世界坐标 Z 方向位置（米），通常为 0（地面）
-
-#### 工厂地图布局
-
-默认工厂地图使用 19x25 的网格布局：
-
-- X 范围：[-9.0, 9.0] 米
-- Y 范围：[-12.0, 12.0] 米
-- 标签间距：1.0 米
-- 标签 ID 按行递增
+定位节点支持三种地图模式：`2d`、`2.5d` 和 `3d`。当 `fusion.mode` 为 `auto` 时，节点使用地图的 `map_type`；手动指定融合模式时，两者必须一致。
 
 ## 使用示例
 
@@ -222,13 +180,13 @@ AprilTag 地图文件，定义标签在世界坐标系中的位置。
   "data_format": "bgr8",
   "frame_id": "camera_custom_optical_frame",
   "intrinsics": {
-    "K": [fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0],
-    "D": [k1, k2, p1, p2, k3],
+    "K": [184.75, 0.0, 320.0, 0.0, 184.75, 240.0, 0.0, 0.0, 1.0],
+    "D": [0.0, 0.0, 0.0, 0.0, 0.0],
     "distortion_model": "plumb_bob"
   },
   "base_to_camera": {
-    "translation": [x, y, z],
-    "rotation_rpy": [roll, pitch, yaw]
+    "translation": [0.0, 0.0, 0.36],
+    "rotation_rpy": [0.0, 0.0, 0.0]
   }
 }
 ```

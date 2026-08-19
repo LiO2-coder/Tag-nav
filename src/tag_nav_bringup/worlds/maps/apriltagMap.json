@@ -1,4 +1,5 @@
 {
+  "schema_version": 1,
   "tag_side_lengths": {
     "default": 0.10
   },
